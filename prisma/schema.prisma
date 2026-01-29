@@ -48,12 +48,11 @@ model User {
   // @@map("user")
 }
 
-// model Category {
-//   id   String @id @default(cuid())
-//   name String @unique
-
-//   medicines Medicine[]
-// }
+model Category {
+  id   String @id @default(cuid())
+  name String @unique
+  medicines Medicine[]
+}
 
 model Medicine {
   id           String   @id @default(cuid())
@@ -64,11 +63,12 @@ model Medicine {
   stock        Int
   manufacturer String
   sellerId     String
+  categoryId   String
   createdAt    DateTime @default(now())
 
   seller     User        @relation(fields: [sellerId], references: [id])
-  // category   Category    @relation(fields: [categoryId], references: [id])
-  category   String[]
+  category   Category    @relation(fields: [categoryId], references: [id])
+  // category   String[]
   reviews    Review[]
   orderItems OrderItem[]
 }

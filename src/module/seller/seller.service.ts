@@ -10,7 +10,7 @@ const postMedicineQuery = async (data: postMedicineType) => {
         // 2️⃣ Transform undefined image to null for Prisma
         const prismaData = {
             ...validatedData,
-            sellerId: "N0L8fRPNjGv85lmz2slQpRORv7jvgBW6",
+            sellerId: "uEfEn65DfNiK2pD9a1krMZPAomg5WolQ",
             image: validatedData.image ?? null, // Prisma expects string | null
         };
 
@@ -65,8 +65,24 @@ const updateMedicineQuery = async (id: string, data: updateMedicineType) => {
     }
 };
 
+const deleteMedicineQuery = async (id: string) => {
+
+    const result = await prisma.medicine.delete({
+        where: {
+            id
+        }
+    })
+
+    if (!result) {
+        throw new Error("Medicine not found or could not be deleted");
+        return;
+    }
+
+    return result;
+}
 
 export const sellerService = {
     postMedicineQuery,
-    updateMedicineQuery
+    updateMedicineQuery,
+    deleteMedicineQuery
 };

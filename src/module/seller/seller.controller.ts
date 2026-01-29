@@ -74,8 +74,33 @@ const updateMedicine = async (
 };
 
 
+const deleteMedicine = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+
+  try {
+
+    const id = req.params.id;
+    const result = await sellerService.deleteMedicineQuery(id as string)
+
+    res.status(200).json({
+      message: "Medicine deleted successfully",
+      data: result
+    })
+  } catch (error) {
+    return res.status(500).json({
+      message: "Internal server error",
+      error: (error as Error).message || "Unknown error",
+    });
+  }
+}
+
+
 
 export const sellerController = {
   postMedicine,
-  updateMedicine
+  updateMedicine,
+  deleteMedicine
 };

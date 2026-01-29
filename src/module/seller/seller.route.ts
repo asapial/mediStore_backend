@@ -7,6 +7,7 @@ const router = Router();
 
 router.post("/medicines", sellerController.postMedicine);
 router.put("/medicines/:id", sellerController.updateMedicine);
+router.delete("/medicines/:id", sellerController.deleteMedicine);
 
 
 // POST	/api/seller/medicines	Add medicine

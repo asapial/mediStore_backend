@@ -3,6 +3,7 @@ import cors from "cors";
 import { auth } from "./lib/auth";
 import { toNodeHandler } from "better-auth/node";
 import { sellerRouter } from "./module/seller/seller.route";
+import { orderRouter } from "./module/orders/order.route";
 
 const app: Application = express()
 app.use(express.json());
@@ -20,11 +21,8 @@ app.use(
 app.all("/api/auth/*splat", toNodeHandler(auth));
 
 app.use("/api/seller", sellerRouter);
+app.use("/api/orders", orderRouter);
 
-
-// app.get('/', (req, res) => {
-//   res.send('Hello World!')
-// })
 
 
 export default app;
