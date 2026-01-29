@@ -32,37 +32,43 @@ model User {
   name      String
   email     String   @unique
   image     String?
-  password  String 
-  role      Role  @default(CUSTOMER)
+  // password  String 
+  role      Role     @default(CUSTOMER)
   isBanned  Boolean  @default(false)
   createdAt DateTime @default(now())
 
-  medicines Medicine[]
-  orders    Order[]
-  reviews   Review[]
+  medicines     Medicine[]
+  orders        Order[]
+  reviews       Review[]
+  emailVerified Boolean    @default(false)
+  updatedAt     DateTime   @updatedAt
+  sessions      Session[]
+  accounts      Account[]
+  @@map("user")
+  // @@map("user")
 }
 
-model Category {
-  id   String @id @default(cuid())
-  name String @unique
+// model Category {
+//   id   String @id @default(cuid())
+//   name String @unique
 
-  medicines Medicine[]
-}
+//   medicines Medicine[]
+// }
 
 model Medicine {
   id           String   @id @default(cuid())
   name         String
   description  String
-  image     String?
+  image        String?
   price        Float
   stock        Int
   manufacturer String
   sellerId     String
-  categoryId   String
   createdAt    DateTime @default(now())
 
   seller     User        @relation(fields: [sellerId], references: [id])
-  category   Category    @relation(fields: [categoryId], references: [id])
+  // category   Category    @relation(fields: [categoryId], references: [id])
+  category   String[]
   reviews    Review[]
   orderItems OrderItem[]
 }
@@ -99,4 +105,52 @@ model Review {
 
   user     User     @relation(fields: [userId], references: [id])
   medicine Medicine @relation(fields: [medicineId], references: [id])
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([token])
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
 }

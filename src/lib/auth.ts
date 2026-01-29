@@ -5,15 +5,21 @@ import { prisma } from "./prisma";
 
 // const prisma = new PrismaClient();
 export const auth = betterAuth({
+    trustedOrigins: ["http://localhost:4000"],
     database: prismaAdapter(prisma, {
         provider: "sqlite", // or "mysql", "postgresql", ...etc
     }),
     emailAndPassword: {
         enabled: true,
     },
-    user:{
-        additionalFields:{
-            
+    user: {
+        additionalFields: {
+            role: {
+                        type: [  "CUSTOMER" ,"SELLER","ADMIN"],
+                        required: false,
+                        defaultValue: 'CUSTOMER',
+                        input: false,
+            }
         }
     }
 });
