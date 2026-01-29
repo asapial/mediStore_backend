@@ -20,7 +20,7 @@ app.get('/', (req, res) => {
 })
 
 app.get('/about', (req, res) => {
-  res.send('Hello Abouttt')
+  res.send('Hello Aboutt')
 })
 
 export default app;
