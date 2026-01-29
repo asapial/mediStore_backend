@@ -25,4 +25,8 @@
     "@prisma/client": "^7.3.0",
     "better-auth": "^1.4.18",
     "cors": "^2.8.6",
-  
+    "dotenv": "^17.2.3",
+    "nodemailer": "^7.0.13",
+    "pg": "^8.17.2"
+  }
+}
