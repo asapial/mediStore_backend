@@ -1,5 +1,5 @@
 import { prisma } from "../../lib/prisma"
-import { updateCategoryType, updateUserType } from "./admin.types";
+import {  updatedCategoryType, updateUserType } from "./admin.types";
 
 const getAllUsersQuery=  async ()=>{
 
@@ -43,18 +43,26 @@ const updateUserQuery= async (userId:string,updatedData:updateUserType)=>{
         throw new Error("User not found");
     }
 
+
+    if(updatedData.image===undefined){
+        updatedData.image=null;
+    }
     const result = await prisma.user.update({
         where:{
             id:userId
         },
-        data:updatedData
+        data:{
+            name:updatedData.name,
+            email:updatedData.email,
+            image:updatedData.image
+        }
     })
 
     return result;
 }
 
 
-const updateCategoryQuery= async (categoryId:string,updatedData:updateCategoryType)=>{
+const updateCategoryQuery= async (categoryId:string,updatedData:updatedCategoryType)=>{
 
     const isPresent= await prisma.category.findUnique({
         where:{
@@ -70,7 +78,9 @@ const updateCategoryQuery= async (categoryId:string,updatedData:updateCategoryTy
         where:{
             id:categoryId
         },
-        data:updatedData
+        data:{
+            name:updatedData.name
+        }
     })
 
     return result;
@@ -85,5 +95,6 @@ export const adminService={
 getAllUsersQuery,
 getAllCategoryQuery,
 updateUserQuery,
-updateCategoryQuery
+updateCategoryQuery,
+getUserDetailsQuery
 }

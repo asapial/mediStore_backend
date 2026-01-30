@@ -7,7 +7,7 @@ export interface updateUserType {
 
 }
 
-export interface updateCategoryType{
+export interface updatedCategoryType{
     name:string
 }
 
