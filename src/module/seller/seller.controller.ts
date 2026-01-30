@@ -97,10 +97,48 @@ const deleteMedicine = async (
   }
 }
 
+const getSellerOrder = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+
+
+  const sellerId = req.user.id;
+  console.log(sellerId)
+
+  try {
+
+    const result = await sellerService.getSellerOrderQuery(sellerId as string);
+
+
+    if (result.length === 0) {
+      return res.status(404).json({
+        status: false,
+        message: "No order found"
+      })
+    }
+
+
+    res.status(200).json({
+      status: true,
+      message: "Data fetched successfully",
+      data: result
+    })
+
+  } catch (error) {
+    return res.status(500).json({
+      message: "Internal server error",
+      error: (error as Error).message || "Unknown error",
+    });
+  }
+}
+
 
 
 export const sellerController = {
   postMedicine,
   updateMedicine,
-  deleteMedicine
+  deleteMedicine,
+  getSellerOrder
 };

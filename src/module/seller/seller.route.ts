@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { sellerController } from "./seller.controller";
+import auth from "../../middleware/auth.middleware";
 
 const router = Router();
 
@@ -8,6 +9,7 @@ const router = Router();
 router.post("/medicines", sellerController.postMedicine);
 router.put("/medicines/:id", sellerController.updateMedicine);
 router.delete("/medicines/:id", sellerController.deleteMedicine);
+router.get("/orders",auth(),sellerController.getSellerOrder)
 
 
 // POST	/api/seller/medicines	Add medicine

@@ -61,6 +61,7 @@ const getUserOrdersQuery = async (userId: string) => {
                             description: true,
                             price: true,
                             image: true,
+                            sellerId:true
                         }
                     }
                 }

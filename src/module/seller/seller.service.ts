@@ -1,6 +1,6 @@
 import { prisma } from "../../lib/prisma";
 import { postMedicineType, postMedicineSchema, updateMedicineType } from "./seller.types";
-import { z, ZodError } from "zod";
+import { string, z, ZodError } from "zod";
 
 const postMedicineQuery = async (data: postMedicineType) => {
     try {
@@ -81,8 +81,60 @@ const deleteMedicineQuery = async (id: string) => {
     return result;
 }
 
+
+const getSellerOrderQuery = async (id: string) => {
+
+    const result = await prisma.order.findMany({
+        where: {
+            items: {
+                some: {
+                    medicine: {
+                        sellerId: id
+                    }
+                }
+            }
+        },
+        include: {
+            items: {
+                where: {
+                    medicine: {
+                        sellerId: id
+                    }
+                },
+                include: {
+                    medicine: {
+                        select: {
+                            name: true,
+                            description: true,
+                            price: true,
+                            image: true,
+                            seller: true
+                        }
+                    },
+                }
+            },
+            user: {
+                select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    image: true
+                }
+            }
+        }
+
+    })
+
+    console.log(result)
+
+
+    return result;
+}
+
+
 export const sellerService = {
     postMedicineQuery,
     updateMedicineQuery,
-    deleteMedicineQuery
+    deleteMedicineQuery,
+    getSellerOrderQuery
 };
