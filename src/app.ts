@@ -28,7 +28,23 @@ app.use("/api/admin", adminRouter);
 
 app.all("/api/auth/*splat", toNodeHandler(auth));
 
+app.get("/", (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: "MediStore API is running 🚀",
+    version: "1.0.0",
+    environment: process.env.NODE_ENV || "development",
+    timestamp: new Date().toISOString()
+  });
+});
 
+app.get("/health", (_req, res) => {
+  res.status(200).json({
+    status: "ok",
+    uptime: process.uptime(),
+    timestamp: Date.now()
+  });
+});
 
 
 export default app;
