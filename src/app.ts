@@ -4,6 +4,7 @@ import { auth } from "./lib/auth";
 import { toNodeHandler } from "better-auth/node";
 import { sellerRouter } from "./module/seller/seller.route";
 import { orderRouter } from "./module/orders/order.route";
+import { adminRouter } from "./module/admin/admin.route";
 
 const app: Application = express()
 app.use(express.json());
@@ -22,6 +23,8 @@ app.all("/api/auth/*splat", toNodeHandler(auth));
 
 app.use("/api/seller", sellerRouter);
 app.use("/api/orders", orderRouter);
+app.use("/api/admin", adminRouter);
+
 
 
 
