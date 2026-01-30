@@ -49,11 +49,40 @@ const getUsersOrder = async (
     }
 }
 
+const getOrderDetails = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+) => {
+
+    const orderId = req.params.id;
+    try {
+
+        const result = await orderService.getOrderDetailsQuery(orderId as string);
+
+        res.status(200).json({
+            success:true,
+            message:"Order details fetched successfully",
+            data:result
+        })
+
+    } catch (error) {
+
+        res.status(500).json({
+            success:false,
+            message:"Failed to fetch order details",
+            error:error
+        })
+
+        // next(error);
+    }
+}
 
 
 
 
 export const orderController = {
     createOrder,
-    getUsersOrder
+    getUsersOrder,
+    getOrderDetails
 }

@@ -8,6 +8,7 @@ const router=Router();
 
 router.post("/",auth(),orderController.createOrder);
 router.get("/",auth(),orderController.getUsersOrder);
+router.get("/:id",auth(),orderController.getOrderDetails);
 
 export const orderRouter=router;
 
