@@ -5,6 +5,7 @@ import { toNodeHandler } from "better-auth/node";
 import { sellerRouter } from "./module/seller/seller.route";
 import { orderRouter } from "./module/orders/order.route";
 import { adminRouter } from "./module/admin/admin.route";
+import { authRouter } from "./module/auth/auth.route";
 
 const app: Application = express()
 app.use(express.json());
@@ -18,12 +19,14 @@ app.use(
   cors(corsOptions)
 )
 
-// app.all("/api/auth/*", toNodeHandler(auth));
-app.all("/api/auth/*splat", toNodeHandler(auth));
 
+app.use("/api/auth", authRouter);
 app.use("/api/seller", sellerRouter);
 app.use("/api/orders", orderRouter);
 app.use("/api/admin", adminRouter);
+
+
+app.all("/api/auth/*splat", toNodeHandler(auth));
 
 
 

@@ -95,9 +95,6 @@ const getAllCategory = async (
     }
 }
 
-
-
-
 const updateUser = async (
     req: Request,
     res: Response,
@@ -127,7 +124,6 @@ const updateUser = async (
     }
 
 }
-
 
 const updateCategory = async (
     req: Request,
