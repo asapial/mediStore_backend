@@ -7,5 +7,11 @@ const router=Router();
 
 
 router.post("/",auth(),orderController.createOrder);
+router.get("/",auth(),orderController.getUsersOrder);
 
 export const orderRouter=router;
+
+
+// POST	/api/orders	Create new order
+// GET	/api/orders	Get user's orders
+// GET	/api/orders/:id	Get order details

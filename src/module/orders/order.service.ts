@@ -1,7 +1,7 @@
 import { prisma } from "../../lib/prisma";
 import { CreateOrderType } from "./order.types";
 
-export const postOrderQuery = async (
+const postOrderQuery = async (
   userId: string,
   data: CreateOrderType
 ) => {
@@ -46,10 +46,37 @@ export const postOrderQuery = async (
   });
 };
 
+const getUserOrdersQuery = async (userId:string)=>{
+
+    const result = await prisma.order.findMany({
+        where:{
+            userId
+        },
+        include:{
+            items:{
+                include:{
+                    medicine:{
+                        select:{
+                            name:true,
+                            description:true,
+                            price:true,
+                            image:true,
+                        }
+                    }
+                }
+            }
+        }
+    })
+
+    return result;
+}
+
+
 
 
 
 
 export const orderService={
-postOrderQuery
+postOrderQuery,
+getUserOrdersQuery
 }

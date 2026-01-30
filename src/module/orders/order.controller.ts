@@ -4,33 +4,56 @@
 import { Request, Response, NextFunction } from "express";
 import { createOrderSchema } from "./order.types";
 import { orderService } from "./order.service";
+import { success } from "zod";
 
 
-export const createOrder = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
+const createOrder = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
 ) => {
-  try {
-    const userId = req.user.id; // from auth middleware
-    const validatedData = createOrderSchema.parse(req.body);
+    try {
+        const userId = req.user.id; // from auth middleware
+        const validatedData = createOrderSchema.parse(req.body);
 
-    const result = await orderService.postOrderQuery(userId, validatedData);
+        const result = await orderService.postOrderQuery(userId, validatedData);
 
-    res.status(201).json({
-      message: "Order placed successfully",
-      data: result,
-    });
-  } catch (error) {
-    next(error);
-  }
+        res.status(201).json({
+            message: "Order placed successfully",
+            data: result,
+        });
+    } catch (error) {
+        next(error);
+    }
 };
 
+const getUsersOrder = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+) => {
+
+    const userId = req.user.id;
+    try {
+
+        const result = await orderService.getUserOrdersQuery(userId as string);
+
+        res.status(200).json({
+            success:true,
+            message:"User orders fetched successfully",
+            data:result
+        })
+
+    } catch (error) {
+        next(error);
+    }
+}
 
 
 
 
 
-export const orderController={
-createOrder
+export const orderController = {
+    createOrder,
+    getUsersOrder
 }
