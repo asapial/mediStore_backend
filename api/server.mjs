@@ -875,10 +875,16 @@ var init_auth_controller = __esm({
             password
           }
         });
-        console.log(result);
+        res.cookie("medistore_token", result.token, {
+          httpOnly: true,
+          secure: true,
+          // REQUIRED (Vercel = HTTPS)
+          sameSite: "none"
+          // REQUIRED (cross-origin)
+        });
         res.status(200).json({
           message: "Login successful",
-          data: result
+          user: result.user
         });
       } catch (error) {
         next(error);
@@ -951,7 +957,7 @@ var init_app = __esm({
       origin: `${process.env.ORIGIN_URL}`,
       optionsSuccessStatus: 200,
       // some legacy browsers (IE11, various SmartTVs) choke on 204
-      Credential: true
+      credentials: true
     };
     app.use(
       cors(corsOptions)

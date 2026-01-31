@@ -38,11 +38,15 @@ const loginController = async (
       },
     });
 
-    console.log(result)
-
+    // ✅ Set token in HTTP-only cookie
+    res.cookie("medistore_token", result.token, {
+      httpOnly: true,
+      secure: true,        // REQUIRED (Vercel = HTTPS)
+      sameSite: "none",    // REQUIRED (cross-origin)
+    });
     res.status(200).json({
       message: "Login successful",
-      data: result,
+      user: result.user,
     });
   } catch (error) {
     next(error);
@@ -84,8 +88,8 @@ const meController = async (
 };
 
 
-export const authController={
-registerController,
-loginController,
-meController
+export const authController = {
+  registerController,
+  loginController,
+  meController
 }
