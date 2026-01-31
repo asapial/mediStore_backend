@@ -5,7 +5,7 @@ import { prisma } from "./prisma";
 
 // const prisma = new PrismaClient();
 export const auth = betterAuth({
-    trustedOrigins: ["http://localhost:4000"],
+    trustedOrigins: ["http://localhost:3000"],
     database: prismaAdapter(prisma, {
         provider: "sqlite", // or "mysql", "postgresql", ...etc
     }),

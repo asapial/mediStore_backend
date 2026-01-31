@@ -16,6 +16,7 @@ const registerController = async (
       },
     });
 
+    console.log(result)
     res.status(201).json(result);
   } catch (error) {
     next(error);
@@ -36,6 +37,8 @@ const loginController = async (
         password,
       },
     });
+
+    console.log(result)
 
     res.status(200).json({
       message: "Login successful",

@@ -112,7 +112,7 @@ var init_auth = __esm({
     "use strict";
     init_prisma();
     auth = betterAuth({
-      trustedOrigins: ["http://localhost:4000"],
+      trustedOrigins: ["http://localhost:3000"],
       database: prismaAdapter(prisma, {
         provider: "sqlite"
         // or "mysql", "postgresql", ...etc
@@ -860,6 +860,7 @@ var init_auth_controller = __esm({
             name: req.body.name
           }
         });
+        console.log(result);
         res.status(201).json(result);
       } catch (error) {
         next(error);
@@ -874,6 +875,7 @@ var init_auth_controller = __esm({
             password
           }
         });
+        console.log(result);
         res.status(200).json({
           message: "Login successful",
           data: result
