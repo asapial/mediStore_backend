@@ -10,13 +10,29 @@ declare global {
     }
 }
 
-const auth = (allowedRoles?: ("user" | "admin")[]) => {
+import { IncomingHttpHeaders } from "http";
+
+export const toFetchHeaders = (headers: IncomingHttpHeaders) => {
+  const result: Record<string, string> = {};
+
+  for (const [key, value] of Object.entries(headers)) {
+    if (typeof value === "string") {
+      result[key] = value;
+    }
+  }
+
+  return result;
+};
+
+const auth = (allowedRoles?: (  "CUSTOMER" | "SELLER" | "ADMIN" )[]) => {
     return async (
         req: express.Request,res: express.Response,next: express.NextFunction) => {
-        
+            console.log("RAW COOKIE HEADER:", req.headers.cookie);
+            
             try {
             const session = await betterAuth.api.getSession({
-                headers: req.headers as any,
+                // headers: req.headers as any,
+                headers: toFetchHeaders(req.headers), 
             });
 
             // ❌ Not logged in

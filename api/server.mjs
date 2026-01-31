@@ -384,16 +384,27 @@ var init_seller_controller = __esm({
 });
 
 // src/middleware/auth.middleware.ts
-var auth2, auth_middleware_default;
+var toFetchHeaders, auth2, auth_middleware_default;
 var init_auth_middleware = __esm({
   "src/middleware/auth.middleware.ts"() {
     "use strict";
     init_auth();
+    toFetchHeaders = (headers) => {
+      const result = {};
+      for (const [key, value] of Object.entries(headers)) {
+        if (typeof value === "string") {
+          result[key] = value;
+        }
+      }
+      return result;
+    };
     auth2 = (allowedRoles) => {
       return async (req, res, next) => {
+        console.log("RAW COOKIE HEADER:", req.headers.cookie);
         try {
           const session = await auth.api.getSession({
-            headers: req.headers
+            // headers: req.headers as any,
+            headers: toFetchHeaders(req.headers)
           });
           if (!session || !session.user) {
             return res.status(401).json({
@@ -914,7 +925,7 @@ var init_auth_route = __esm({
     router4 = Router4();
     router4.post("/register", authController.registerController);
     router4.post("/login", authController.loginController);
-    router4.get("/me", auth_middleware_default(), authController.meController);
+    router4.get("/me", auth_middleware_default(["CUSTOMER", "SELLER", "ADMIN"]), authController.meController);
     authRouter = router4;
   }
 });
@@ -936,8 +947,9 @@ var init_app = __esm({
     app.use(express.json());
     corsOptions = {
       origin: `${process.env.ORIGIN_URL}`,
-      optionsSuccessStatus: 200
+      optionsSuccessStatus: 200,
       // some legacy browsers (IE11, various SmartTVs) choke on 204
+      Credential: true
     };
     app.use(
       cors(corsOptions)
@@ -978,7 +990,6 @@ var require_server = __commonJS({
         await prisma.$connect();
         console.log("Connected to the database successfully.");
         app_default.listen(PORT, () => {
-          console.log(`Server is running on http://localhost:${PORT}`);
         });
       } catch (error) {
         console.error("An error occurred:", error);
