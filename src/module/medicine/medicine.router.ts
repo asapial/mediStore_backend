@@ -6,5 +6,6 @@ const router= Router();
 
 
 router.get("/",medicineController.getAllMedicines );
+router.get("/:id",medicineController.getMedicineById );
 
 export const medicineRouter=router;

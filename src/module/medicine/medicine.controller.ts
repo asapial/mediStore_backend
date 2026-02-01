@@ -16,4 +16,28 @@ const getAllMedicines = async (req: Request, res: Response, next: NextFunction) 
   }
 };
 
-export const medicineController = { getAllMedicines };
+
+const getMedicineById = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { id } = req.params;
+    const medicine = await medicineService.getMedicineById(id as string);
+
+    res.status(200).json({
+      success: true,
+      data: medicine,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const medicineController = {
+
+  getAllMedicines,
+  getMedicineById
+
+};
