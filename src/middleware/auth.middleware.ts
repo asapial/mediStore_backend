@@ -1,6 +1,6 @@
 import express from "express";
 import { auth as betterAuth } from "../lib/auth";
-import cookieParser from "cookie-parser";
+
 
 declare global {
     namespace Express {
@@ -11,7 +11,7 @@ declare global {
     }
 }
 
-const authMiddleware = (allowedRoles?: ("CUSTOMER" | "SELLER" | "ADMIN")[]) => {
+const auth = (allowedRoles?: ("CUSTOMER" | "SELLER" | "ADMIN")[]) => {
     return async (
         req: express.Request,
         res: express.Response,
@@ -60,6 +60,6 @@ const authMiddleware = (allowedRoles?: ("CUSTOMER" | "SELLER" | "ADMIN")[]) => {
     };
 };
 
-export default authMiddleware;
+export default auth;
 
 

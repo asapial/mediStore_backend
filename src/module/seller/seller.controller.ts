@@ -11,7 +11,11 @@ const postMedicine = async (
   try {
     const data: postMedicineType = req.body;
 
-    const result = await sellerService.postMedicineQuery(data);
+    const sellerId= req.user.id;
+
+    console.log(sellerId)
+
+    const result = await sellerService.postMedicineQuery(data,sellerId as string);
 
     res.status(201).json({
       message: "Medicine Added Successfully",
@@ -135,10 +139,29 @@ const getSellerOrder = async (
 }
 
 
+const sellerStatController = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const sellerId = req.user?.id; // assume auth middleware sets req.user
+    if (!sellerId) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    const stats = await sellerService.getSellerStats(sellerId);
+
+    res.status(200).json({
+      success: true,
+      data: stats,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 
 export const sellerController = {
   postMedicine,
   updateMedicine,
   deleteMedicine,
-  getSellerOrder
+  getSellerOrder,
+  sellerStatController
 };

@@ -6,10 +6,12 @@ const router = Router();
 
 
 
-router.post("/medicines", sellerController.postMedicine);
+router.post("/medicines",auth(), sellerController.postMedicine);
 router.put("/medicines/:id", sellerController.updateMedicine);
 router.delete("/medicines/:id", sellerController.deleteMedicine);
 router.get("/orders",auth(),sellerController.getSellerOrder)
+router.get("/stat", auth(), sellerController.sellerStatController);
+// router.get("/stat", auth(["SELLER"]), sellerController.sellerStatController);
 
 
 // POST	/api/seller/medicines	Add medicine

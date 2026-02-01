@@ -16,6 +16,26 @@ const getAllMedicines = async (req: Request, res: Response, next: NextFunction) 
   }
 };
 
+const getMyMedicines = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+
+    const userId=req.user.id;
+    // Pass query parameters as filters to service
+    const medicines = await medicineService.getMyMedicines(userId as string);
+
+    console.log(userId)
+    console.log(medicines);
+
+    res.status(200).json({
+      success: true,
+      count: medicines.length,
+      data: medicines,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 
 const getMedicineById = async (
   req: Request,
@@ -38,6 +58,7 @@ const getMedicineById = async (
 export const medicineController = {
 
   getAllMedicines,
-  getMedicineById
+  getMedicineById,
+  getMyMedicines
 
 };

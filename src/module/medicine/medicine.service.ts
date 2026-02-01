@@ -48,6 +48,31 @@ const getAllMedicines = async (filters: GetAllMedicinesFilters) => {
   return medicines;
 };
 
+const getMyMedicines = async (sellerId:string) => {
+
+  const medicines = await prisma.medicine.findMany({
+    where:{
+      sellerId:sellerId
+    },
+    include:{
+      category:{
+        select:{
+          name:true
+        }
+      },
+      seller:{
+        select:{
+          name:true
+        }
+      }
+    }
+
+  });
+
+  console.log(medicines)
+
+  return medicines;
+};
 
 const getMedicineById = async (id: string) => {
   const medicine = await prisma.medicine.findUnique({
@@ -79,7 +104,8 @@ const getMedicineById = async (id: string) => {
 
 export const medicineService = {
   getAllMedicines,
-  getMedicineById
+  getMedicineById,
+  getMyMedicines
 
 
   

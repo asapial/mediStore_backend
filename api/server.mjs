@@ -112,9 +112,9 @@ var init_auth = __esm({
     "use strict";
     init_prisma();
     auth = betterAuth({
-      trustedOrigins: ["http://localhost:3000", "https://medistore-pearl.vercel.app"],
+      trustedOrigins: ["https://medi-store-frontend-nine.vercel.app", "http://localhost:3000"],
       database: prismaAdapter(prisma, {
-        provider: "sqlite"
+        provider: "postgresql"
         // or "mysql", "postgresql", ...etc
       }),
       emailAndPassword: {
@@ -128,6 +128,13 @@ var init_auth = __esm({
             defaultValue: "CUSTOMER",
             input: false
           }
+        }
+      },
+      advanced: {
+        defaultCookieAttributes: {
+          sameSite: "none",
+          secure: true,
+          httpOnly: true
         }
       }
     });
@@ -164,7 +171,7 @@ var init_seller_types = __esm({
 
 // src/module/seller/seller.service.ts
 import { ZodError } from "zod";
-var postMedicineQuery, updateMedicineQuery, deleteMedicineQuery, getSellerOrderQuery, sellerService;
+var postMedicineQuery, updateMedicineQuery, deleteMedicineQuery, getSellerOrderQuery, getSellerStats, sellerService;
 var init_seller_service = __esm({
   "src/module/seller/seller.service.ts"() {
     "use strict";
@@ -269,18 +276,147 @@ var init_seller_service = __esm({
       console.log(result);
       return result;
     };
+    getSellerStats = async (sellerId) => {
+      const LOW_STOCK_THRESHOLD = 10;
+      const [
+        totalMedicines,
+        outOfStockMedicines,
+        lowStockMedicines,
+        medicinePriceAgg
+      ] = await Promise.all([
+        prisma.medicine.count({ where: { sellerId } }),
+        prisma.medicine.count({
+          where: { sellerId, stock: 0 }
+        }),
+        prisma.medicine.count({
+          where: {
+            sellerId,
+            stock: { gt: 0, lte: LOW_STOCK_THRESHOLD }
+          }
+        }),
+        prisma.medicine.aggregate({
+          where: { sellerId },
+          _avg: { price: true }
+        })
+      ]);
+      const orders = await prisma.order.findMany({
+        where: {
+          items: {
+            some: {
+              medicine: { sellerId }
+            }
+          }
+        },
+        include: {
+          items: {
+            select: {
+              quantity: true,
+              price: true,
+              medicine: {
+                select: { sellerId: true }
+              }
+            }
+          }
+        }
+      });
+      const totalOrders = orders.length;
+      let totalSold = 0;
+      let totalRevenue = 0;
+      orders.forEach((order) => {
+        order.items.forEach((item) => {
+          if (item.medicine.sellerId === sellerId) {
+            totalSold += item.quantity;
+            totalRevenue += item.price * item.quantity;
+          }
+        });
+      });
+      const ordersByStatus = await prisma.order.groupBy({
+        by: ["status"],
+        where: {
+          items: {
+            some: {
+              medicine: { sellerId }
+            }
+          }
+        },
+        _count: true
+      });
+      const completedOrders = ordersByStatus.find((o) => o.status === "DELIVERED")?._count || 0;
+      const cancelledOrders = ordersByStatus.find((o) => o.status === "CANCELLED")?._count || 0;
+      const todayStart = /* @__PURE__ */ new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const monthStart = new Date(
+        todayStart.getFullYear(),
+        todayStart.getMonth(),
+        1
+      );
+      const timeOrders = await prisma.order.findMany({
+        where: {
+          createdAt: { gte: monthStart },
+          items: {
+            some: {
+              medicine: { sellerId }
+            }
+          }
+        },
+        include: {
+          items: {
+            select: {
+              quantity: true,
+              price: true,
+              medicine: {
+                select: { sellerId: true }
+              }
+            }
+          }
+        }
+      });
+      let todayRevenue = 0;
+      let thisMonthRevenue = 0;
+      timeOrders.forEach((order) => {
+        order.items.forEach((item) => {
+          if (item.medicine.sellerId === sellerId) {
+            const revenue = item.quantity * item.price;
+            thisMonthRevenue += revenue;
+            if (order.createdAt >= todayStart) {
+              todayRevenue += revenue;
+            }
+          }
+        });
+      });
+      return {
+        // Medicines
+        totalMedicines,
+        outOfStockMedicines,
+        lowStockMedicines,
+        averagePrice: medicinePriceAgg._avg.price || 0,
+        // Orders
+        totalOrders,
+        completedOrders,
+        cancelledOrders,
+        ordersByStatus,
+        // Sales
+        totalSold,
+        totalRevenue,
+        averageOrderValue: totalOrders > 0 ? totalRevenue / totalOrders : 0,
+        // Time-based
+        todayRevenue,
+        thisMonthRevenue
+      };
+    };
     sellerService = {
       postMedicineQuery,
       updateMedicineQuery,
       deleteMedicineQuery,
-      getSellerOrderQuery
+      getSellerOrderQuery,
+      getSellerStats
     };
   }
 });
 
 // src/module/seller/seller.controller.ts
 import { ZodError as ZodError2 } from "zod";
-var postMedicine, updateMedicine, deleteMedicine, getSellerOrder, sellerController;
+var postMedicine, updateMedicine, deleteMedicine, getSellerOrder, sellerStatController, sellerController;
 var init_seller_controller = __esm({
   "src/module/seller/seller.controller.ts"() {
     "use strict";
@@ -374,22 +510,38 @@ var init_seller_controller = __esm({
         });
       }
     };
+    sellerStatController = async (req, res, next) => {
+      try {
+        const sellerId = req.user?.id;
+        if (!sellerId) {
+          return res.status(401).json({ success: false, message: "Unauthorized" });
+        }
+        const stats = await sellerService.getSellerStats(sellerId);
+        res.status(200).json({
+          success: true,
+          data: stats
+        });
+      } catch (error) {
+        next(error);
+      }
+    };
     sellerController = {
       postMedicine,
       updateMedicine,
       deleteMedicine,
-      getSellerOrder
+      getSellerOrder,
+      sellerStatController
     };
   }
 });
 
 // src/middleware/auth.middleware.ts
-var authMiddleware, auth_middleware_default;
+var auth2, auth_middleware_default;
 var init_auth_middleware = __esm({
   "src/middleware/auth.middleware.ts"() {
     "use strict";
     init_auth();
-    authMiddleware = (allowedRoles) => {
+    auth2 = (allowedRoles) => {
       return async (req, res, next) => {
         try {
           const session = await auth.api.getSession({
@@ -421,7 +573,7 @@ var init_auth_middleware = __esm({
         }
       };
     };
-    auth_middleware_default = authMiddleware;
+    auth_middleware_default = auth2;
   }
 });
 
@@ -438,6 +590,7 @@ var init_seller_route = __esm({
     router.put("/medicines/:id", sellerController.updateMedicine);
     router.delete("/medicines/:id", sellerController.deleteMedicine);
     router.get("/orders", auth_middleware_default(), sellerController.getSellerOrder);
+    router.get("/stat", auth_middleware_default(), sellerController.sellerStatController);
     sellerRouter = router;
   }
 });
@@ -930,6 +1083,168 @@ var init_auth_route = __esm({
   }
 });
 
+// src/module/medicine/medicine.service.ts
+var getAllMedicines, getMyMedicines, getMedicineById, medicineService;
+var init_medicine_service = __esm({
+  "src/module/medicine/medicine.service.ts"() {
+    "use strict";
+    init_prisma();
+    getAllMedicines = async (filters) => {
+      const { categoryId, sellerId, name, minPrice, maxPrice } = filters;
+      const where = {};
+      if (categoryId) where.categoryId = categoryId;
+      if (sellerId) where.sellerId = sellerId;
+      if (name) where.name = { contains: String(name), mode: "insensitive" };
+      if (minPrice || maxPrice) {
+        where.price = {};
+        if (minPrice) where.price.gte = Number(minPrice);
+        if (maxPrice) where.price.lte = Number(maxPrice);
+      }
+      const medicines = await prisma.medicine.findMany({
+        where,
+        include: {
+          category: {
+            select: {
+              id: true,
+              name: true
+            }
+          },
+          seller: {
+            select: {
+              id: true,
+              name: true,
+              email: true
+            }
+          }
+        },
+        orderBy: {
+          createdAt: "desc"
+        }
+      });
+      return medicines;
+    };
+    getMyMedicines = async (sellerId) => {
+      const medicines = await prisma.medicine.findMany({
+        where: {
+          sellerId
+        },
+        include: {
+          category: {
+            select: {
+              name: true
+            }
+          },
+          seller: {
+            select: {
+              name: true
+            }
+          }
+        }
+      });
+      console.log(medicines);
+      return medicines;
+    };
+    getMedicineById = async (id) => {
+      const medicine = await prisma.medicine.findUnique({
+        where: { id },
+        include: {
+          category: {
+            select: {
+              id: true,
+              name: true
+            }
+          },
+          seller: {
+            select: {
+              id: true,
+              name: true,
+              email: true
+            }
+          }
+        }
+      });
+      if (!medicine) {
+        throw new Error("Medicine not found");
+      }
+      return medicine;
+    };
+    medicineService = {
+      getAllMedicines,
+      getMedicineById,
+      getMyMedicines
+    };
+  }
+});
+
+// src/module/medicine/medicine.controller.ts
+var getAllMedicines2, getMyMedicines2, getMedicineById2, medicineController;
+var init_medicine_controller = __esm({
+  "src/module/medicine/medicine.controller.ts"() {
+    "use strict";
+    init_medicine_service();
+    getAllMedicines2 = async (req, res, next) => {
+      try {
+        const medicines = await medicineService.getAllMedicines(req.query);
+        res.status(200).json({
+          success: true,
+          count: medicines.length,
+          data: medicines
+        });
+      } catch (error) {
+        next(error);
+      }
+    };
+    getMyMedicines2 = async (req, res, next) => {
+      try {
+        const userId = req.user.id;
+        const medicines = await medicineService.getMyMedicines(userId);
+        console.log(userId);
+        console.log(medicines);
+        res.status(200).json({
+          success: true,
+          count: medicines.length,
+          data: medicines
+        });
+      } catch (error) {
+        next(error);
+      }
+    };
+    getMedicineById2 = async (req, res, next) => {
+      try {
+        const { id } = req.params;
+        const medicine = await medicineService.getMedicineById(id);
+        res.status(200).json({
+          success: true,
+          data: medicine
+        });
+      } catch (error) {
+        next(error);
+      }
+    };
+    medicineController = {
+      getAllMedicines: getAllMedicines2,
+      getMedicineById: getMedicineById2,
+      getMyMedicines: getMyMedicines2
+    };
+  }
+});
+
+// src/module/medicine/medicine.router.ts
+import { Router as Router5 } from "express";
+var router5, medicineRouter;
+var init_medicine_router = __esm({
+  "src/module/medicine/medicine.router.ts"() {
+    "use strict";
+    init_medicine_controller();
+    init_auth_middleware();
+    router5 = Router5();
+    router5.get("/", medicineController.getAllMedicines);
+    router5.get("/own", auth_middleware_default(), medicineController.getMyMedicines);
+    router5.get("/:id", medicineController.getMedicineById);
+    medicineRouter = router5;
+  }
+});
+
 // src/app.ts
 import express from "express";
 import cors from "cors";
@@ -944,22 +1259,23 @@ var init_app = __esm({
     init_order_route();
     init_admin_route();
     init_auth_route();
+    init_medicine_router();
     app = express();
+    corsOptions = {
+      origin: "https://medi-store-frontend-nine.vercel.app",
+      credentials: true,
+      methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+      allowedHeaders: ["Content-Type", "Authorization"],
+      optionsSuccessStatus: 200
+    };
+    app.use(cors(corsOptions));
     app.use(cookieParser());
     app.use(express.json());
-    corsOptions = {
-      origin: `${process.env.ORIGIN_URL}`,
-      optionsSuccessStatus: 200,
-      // some legacy browsers (IE11, various SmartTVs) choke on 204
-      credentials: true
-    };
-    app.use(
-      cors(corsOptions)
-    );
     app.use("/api/auth", authRouter);
     app.use("/api/seller", sellerRouter);
     app.use("/api/orders", orderRouter);
     app.use("/api/admin", adminRouter);
+    app.use("/api/medicines", medicineRouter);
     app.all("/api/auth/*splat", toNodeHandler(auth));
     app.get("/", (req, res) => {
       res.status(200).json({

@@ -5,9 +5,9 @@ import { prisma } from "./prisma";
 
 // const prisma = new PrismaClient();
 export const auth = betterAuth({
-    trustedOrigins: ["http://localhost:3000","https://medistore-pearl.vercel.app"],
+    trustedOrigins: ["https://medi-store-frontend-nine.vercel.app", "http://localhost:3000"],
     database: prismaAdapter(prisma, {
-        provider: "sqlite", // or "mysql", "postgresql", ...etc
+        provider: "postgresql", // or "mysql", "postgresql", ...etc
     }),
     emailAndPassword: {
         enabled: true,
@@ -20,6 +20,13 @@ export const auth = betterAuth({
                         defaultValue: 'CUSTOMER',
                         input: false,
             }
+        }
+    },
+    advanced:{
+        defaultCookieAttributes:{
+            sameSite:"none",
+            secure:true,
+            httpOnly:true
         }
     }
 });

@@ -2,15 +2,16 @@ import { prisma } from "../../lib/prisma";
 import { postMedicineType, postMedicineSchema, updateMedicineType } from "./seller.types";
 import { string, z, ZodError } from "zod";
 
-const postMedicineQuery = async (data: postMedicineType) => {
+const postMedicineQuery = async (data: postMedicineType, sellerId: string) => {
     try {
+        console.log(sellerId)
         // 1️⃣ Validate input using Zod
         const validatedData = postMedicineSchema.parse(data);
 
         // 2️⃣ Transform undefined image to null for Prisma
         const prismaData = {
             ...validatedData,
-            sellerId: "uEfEn65DfNiK2pD9a1krMZPAomg5WolQ",
+            sellerId: sellerId,
             image: validatedData.image ?? null, // Prisma expects string | null
         };
 
@@ -84,57 +85,213 @@ const deleteMedicineQuery = async (id: string) => {
 
 const getSellerOrderQuery = async (id: string) => {
 
-    const result = await prisma.order.findMany({
-        where: {
-            items: {
-                some: {
-                    medicine: {
-                        sellerId: id
-                    }
-                }
-            }
-        },
+    console.log("sessss", id)
+    const orders = await prisma.order.findMany({
         include: {
             items: {
-                where: {
-                    medicine: {
-                        sellerId: id
-                    }
-                },
-                include: {
-                    medicine: {
-                        select: {
-                            name: true,
-                            description: true,
-                            price: true,
-                            image: true,
-                            seller: true
-                        }
-                    },
-                }
-            },
-            user: {
                 select: {
                     id: true,
-                    name: true,
-                    email: true,
-                    image: true
+                    orderId: true,
+                    medicineId: true,
+                    quantity: true,
+                    price: true,
+                    medicine: {
+                        select: {
+                            sellerId: true,
+                            name:true
+                        }
+                    }
+
                 }
             }
         }
-
     })
 
-    console.log(result)
+    console.log(orders)
 
+  const filteredOrders = orders.flatMap(order => {
+    const items = order.items.filter(
+      item => item.medicine?.sellerId === id
+    );
 
-    return result;
+    if (!items.length) return []; // ❌ order removed completely
+
+    return [{
+      id: order.id,
+      status: order.status,
+      address: order.address,
+      createdAt: order.createdAt,
+      items,
+    }];
+  });
+
+  return filteredOrders;
+
 }
 
+
+const getSellerStats = async (sellerId: string) => {
+    const LOW_STOCK_THRESHOLD = 10;
+
+    /* ------------------ MEDICINE STATS ------------------ */
+    const [
+        totalMedicines,
+        outOfStockMedicines,
+        lowStockMedicines,
+        medicinePriceAgg,
+    ] = await Promise.all([
+        prisma.medicine.count({ where: { sellerId } }),
+
+        prisma.medicine.count({
+            where: { sellerId, stock: 0 },
+        }),
+
+        prisma.medicine.count({
+            where: {
+                sellerId,
+                stock: { gt: 0, lte: LOW_STOCK_THRESHOLD },
+            },
+        }),
+
+        prisma.medicine.aggregate({
+            where: { sellerId },
+            _avg: { price: true },
+        }),
+    ]);
+
+    /* ------------------ ORDER DATA ------------------ */
+    const orders = await prisma.order.findMany({
+        where: {
+            items: {
+                some: {
+                    medicine: { sellerId },
+                },
+            },
+        },
+        include: {
+            items: {
+                select: {
+                    quantity: true,
+                    price: true,
+                    medicine: {
+                        select: { sellerId: true },
+                    },
+                },
+            },
+        },
+    });
+
+    const totalOrders = orders.length;
+
+    /* ------------------ SALES CALCULATION ------------------ */
+    let totalSold = 0;
+    let totalRevenue = 0;
+
+    orders.forEach((order) => {
+        order.items.forEach((item) => {
+            if (item.medicine.sellerId === sellerId) {
+                totalSold += item.quantity;
+                totalRevenue += item.price * item.quantity;
+            }
+        });
+    });
+
+    /* ------------------ ORDER STATUS STATS ------------------ */
+    const ordersByStatus = await prisma.order.groupBy({
+        by: ["status"],
+        where: {
+            items: {
+                some: {
+                    medicine: { sellerId },
+                },
+            },
+        },
+        _count: true,
+    });
+
+    const completedOrders =
+        ordersByStatus.find((o) => o.status === "DELIVERED")?._count || 0;
+
+    const cancelledOrders =
+        ordersByStatus.find((o) => o.status === "CANCELLED")?._count || 0;
+
+    /* ------------------ TIME-BASED REVENUE ------------------ */
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    const monthStart = new Date(
+        todayStart.getFullYear(),
+        todayStart.getMonth(),
+        1
+    );
+
+    const timeOrders = await prisma.order.findMany({
+        where: {
+            createdAt: { gte: monthStart },
+            items: {
+                some: {
+                    medicine: { sellerId },
+                },
+            },
+        },
+        include: {
+            items: {
+                select: {
+                    quantity: true,
+                    price: true,
+                    medicine: {
+                        select: { sellerId: true },
+                    },
+                },
+            },
+        },
+    });
+
+    let todayRevenue = 0;
+    let thisMonthRevenue = 0;
+
+    timeOrders.forEach((order) => {
+        order.items.forEach((item) => {
+            if (item.medicine.sellerId === sellerId) {
+                const revenue = item.quantity * item.price;
+                thisMonthRevenue += revenue;
+
+                if (order.createdAt >= todayStart) {
+                    todayRevenue += revenue;
+                }
+            }
+        });
+    });
+
+    return {
+        // Medicines
+        totalMedicines,
+        outOfStockMedicines,
+        lowStockMedicines,
+        averagePrice: medicinePriceAgg._avg.price || 0,
+
+        // Orders
+        totalOrders,
+        completedOrders,
+        cancelledOrders,
+        ordersByStatus,
+
+        // Sales
+        totalSold,
+        totalRevenue,
+        averageOrderValue:
+            totalOrders > 0 ? totalRevenue / totalOrders : 0,
+
+        // Time-based
+        todayRevenue,
+        thisMonthRevenue,
+    };
+};
 
 export const sellerService = {
     postMedicineQuery,
     updateMedicineQuery,
     deleteMedicineQuery,
-    getSellerOrderQuery
+    getSellerOrderQuery,
+    getSellerStats
 };
