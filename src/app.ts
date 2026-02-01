@@ -7,8 +7,11 @@ import { sellerRouter } from "./module/seller/seller.route";
 import { orderRouter } from "./module/orders/order.route";
 import { adminRouter } from "./module/admin/admin.route";
 import { authRouter } from "./module/auth/auth.route";
+import cookieParser from "cookie-parser";
+import { medicineRouter } from "./module/medicine/medicine.router";
 
 const app: Application = express()
+app.use(cookieParser());
 app.use(express.json());
 
 const corsOptions = {
@@ -26,6 +29,7 @@ app.use("/api/auth", authRouter);
 app.use("/api/seller", sellerRouter);
 app.use("/api/orders", orderRouter);
 app.use("/api/admin", adminRouter);
+app.use("/api/medicines", medicineRouter);
 
 
 app.all("/api/auth/*splat", toNodeHandler(auth));

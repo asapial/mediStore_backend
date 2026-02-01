@@ -112,7 +112,7 @@ var init_auth = __esm({
     "use strict";
     init_prisma();
     auth = betterAuth({
-      trustedOrigins: ["http://localhost:3000"],
+      trustedOrigins: ["http://localhost:3000", "https://medistore-pearl.vercel.app"],
       database: prismaAdapter(prisma, {
         provider: "sqlite"
         // or "mysql", "postgresql", ...etc
@@ -384,28 +384,19 @@ var init_seller_controller = __esm({
 });
 
 // src/middleware/auth.middleware.ts
-var toFetchHeaders, auth2, auth_middleware_default;
+var authMiddleware, auth_middleware_default;
 var init_auth_middleware = __esm({
   "src/middleware/auth.middleware.ts"() {
     "use strict";
     init_auth();
-    toFetchHeaders = (headers) => {
-      const result = {};
-      for (const [key, value] of Object.entries(headers)) {
-        if (typeof value === "string") {
-          result[key] = value;
-        }
-      }
-      return result;
-    };
-    auth2 = (allowedRoles) => {
+    authMiddleware = (allowedRoles) => {
       return async (req, res, next) => {
-        console.log("RAW COOKIE HEADER:", req.headers.cookie);
         try {
           const session = await auth.api.getSession({
-            // headers: req.headers as any,
-            headers: toFetchHeaders(req.headers)
+            headers: req.headers
           });
+          console.log("Headers ", req.headers);
+          console.log("Session ", session);
           if (!session || !session.user) {
             return res.status(401).json({
               success: false,
@@ -422,15 +413,15 @@ var init_auth_middleware = __esm({
           req.session = session.session;
           next();
         } catch (error) {
-          console.error("Auth middleware error:", error);
+          console.error("Auth middleware unexpected error:", error);
           return res.status(500).json({
             success: false,
-            message: "Authentication failed."
+            message: "Internal server error while authenticating."
           });
         }
       };
     };
-    auth_middleware_default = auth2;
+    auth_middleware_default = authMiddleware;
   }
 });
 
@@ -853,15 +844,21 @@ var init_auth_controller = __esm({
     init_prisma();
     registerController = async (req, res, next) => {
       try {
-        const result = await auth.api.signUpEmail({
-          body: {
-            email: req.body.email,
-            password: req.body.password,
-            name: req.body.name
-          }
+        const { email, password, name } = req.body;
+        const { headers, response } = await auth.api.signUpEmail({
+          returnHeaders: true,
+          // we need headers for cookies
+          body: { email, password, name }
         });
-        console.log(result);
-        res.status(201).json(result);
+        const setCookie = headers.get("set-cookie");
+        if (setCookie) {
+          res.setHeader("Set-Cookie", setCookie);
+        }
+        res.status(201).json({
+          message: "Registration successful",
+          data: response
+          // optional: return user info
+        });
       } catch (error) {
         next(error);
       }
@@ -869,22 +866,18 @@ var init_auth_controller = __esm({
     loginController = async (req, res, next) => {
       try {
         const { email, password } = req.body;
-        const result = await auth.api.signInEmail({
-          body: {
-            email,
-            password
-          }
+        const { headers, response } = await auth.api.signInEmail({
+          returnHeaders: true,
+          body: { email, password }
         });
-        res.cookie("medistore_token", result.token, {
-          httpOnly: true,
-          secure: true,
-          // REQUIRED (Vercel = HTTPS)
-          sameSite: "none"
-          // REQUIRED (cross-origin)
-        });
+        const setCookie = headers.get("set-cookie");
+        console.log("Data form login controller:", setCookie);
+        if (setCookie) {
+          res.setHeader("Set-Cookie", setCookie);
+        }
         res.status(200).json({
           message: "Login successful",
-          user: result.user
+          user: response.user
         });
       } catch (error) {
         next(error);
@@ -892,12 +885,11 @@ var init_auth_controller = __esm({
     };
     meController = async (req, res, next) => {
       try {
-        const userId = req.user.id;
-        if (!userId) {
+        if (!req.user || !req.user.id) {
           return res.status(401).json({ message: "Unauthorized" });
         }
         const user = await prisma.user.findUnique({
-          where: { id: userId },
+          where: { id: req.user.id },
           select: {
             id: true,
             name: true,
@@ -942,6 +934,7 @@ var init_auth_route = __esm({
 import express from "express";
 import cors from "cors";
 import { toNodeHandler } from "better-auth/node";
+import cookieParser from "cookie-parser";
 var app, corsOptions, app_default;
 var init_app = __esm({
   "src/app.ts"() {
@@ -952,6 +945,7 @@ var init_app = __esm({
     init_admin_route();
     init_auth_route();
     app = express();
+    app.use(cookieParser());
     app.use(express.json());
     corsOptions = {
       origin: `${process.env.ORIGIN_URL}`,
@@ -992,12 +986,13 @@ var require_server = __commonJS({
   "src/server.ts"() {
     init_app();
     init_prisma();
-    var PORT = process.env.PORT || 3e3;
+    var PORT = process.env.PORT || 5e3;
     async function main() {
       try {
         await prisma.$connect();
         console.log("Connected to the database successfully.");
         app_default.listen(PORT, () => {
+          console.log(`Server is running on http://localhost:${PORT}`);
         });
       } catch (error) {
         console.error("An error occurred:", error);
