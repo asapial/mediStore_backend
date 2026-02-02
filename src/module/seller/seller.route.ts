@@ -11,7 +11,8 @@ router.put("/medicines/:id", sellerController.updateMedicine);
 router.delete("/medicines/:id", sellerController.deleteMedicine);
 router.get("/orders",auth(),sellerController.getSellerOrder)
 router.get("/stat", auth(), sellerController.sellerStatController);
-// router.get("/stat", auth(["SELLER"]), sellerController.sellerStatController);
+router.put("/orders",sellerController.updateOrderItemStatus);
+
 
 
 // POST	/api/seller/medicines	Add medicine

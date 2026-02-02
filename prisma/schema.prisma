@@ -89,6 +89,7 @@ model OrderItem {
   orderId    String
   medicineId String
   quantity   Int
+  status    OrderStatus @default(PLACED)
   price      Float
 
   order    Order    @relation(fields: [orderId], references: [id])

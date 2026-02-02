@@ -1,3 +1,4 @@
+import { OrderStatus } from "../../../generated/prisma/enums";
 import { prisma } from "../../lib/prisma";
 import { postMedicineType, postMedicineSchema, updateMedicineType } from "./seller.types";
 import { string, z, ZodError } from "zod";
@@ -95,10 +96,11 @@ const getSellerOrderQuery = async (id: string) => {
                     medicineId: true,
                     quantity: true,
                     price: true,
+                    status:true,
                     medicine: {
                         select: {
                             sellerId: true,
-                            name:true
+                            name: true
                         }
                     }
 
@@ -109,23 +111,23 @@ const getSellerOrderQuery = async (id: string) => {
 
     console.log(orders)
 
-  const filteredOrders = orders.flatMap(order => {
-    const items = order.items.filter(
-      item => item.medicine?.sellerId === id
-    );
+    const filteredOrders = orders.flatMap(order => {
+        const items = order.items.filter(
+            item => item.medicine?.sellerId === id
+        );
 
-    if (!items.length) return []; // ❌ order removed completely
+        if (!items.length) return []; // ❌ order removed completely
 
-    return [{
-      id: order.id,
-      status: order.status,
-      address: order.address,
-      createdAt: order.createdAt,
-      items,
-    }];
-  });
+        return [{
+            id: order.id,
+            status: order.status,
+            address: order.address,
+            createdAt: order.createdAt,
+            items,
+        }];
+    });
 
-  return filteredOrders;
+    return filteredOrders;
 
 }
 
@@ -288,10 +290,47 @@ const getSellerStats = async (sellerId: string) => {
     };
 };
 
+
+const updateOrderItemStatusQuery = async (
+    orderId: string,
+    orderItemsList: string[],
+    // status: OrderStatus // <- strongly typed
+    status: string // <- strongly typed
+) => {
+    await prisma.orderItem.updateMany({
+        where: {
+            id: { in: orderItemsList },
+            orderId,
+        },
+        data: {
+            status:status, // ✅ pass the enum, not string
+        },
+    });
+
+    const remaining = await prisma.orderItem.count({
+        where: {
+            orderId,
+            status: { not: status },
+        },
+    });
+
+    if (remaining === 0) {
+        await prisma.order.update({
+            where: { id: orderId },
+            data: { status },
+        });
+    }
+
+    return { success: true };
+};
+
+
+
 export const sellerService = {
     postMedicineQuery,
     updateMedicineQuery,
     deleteMedicineQuery,
     getSellerOrderQuery,
-    getSellerStats
+    getSellerStats,
+    updateOrderItemStatusQuery
 };

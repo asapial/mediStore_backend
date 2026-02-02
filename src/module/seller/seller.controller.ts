@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { postMedicineType, updateMedicineType } from "./seller.types";
 import { sellerService } from "./seller.service";
 import { string, ZodError } from "zod";
+import { OrderStatus } from "../../../generated/prisma/enums";
 
 const postMedicine = async (
   req: Request,
@@ -158,10 +159,68 @@ const sellerStatController = async (req: Request, res: Response, next: NextFunct
 };
 
 
+const updateOrderItemStatus = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { orderId, orderItemIds, status } = req.body;
+
+    console.log(orderId, orderItemIds,status)
+
+    // 🧪 Basic validation
+    if (!orderId || !Array.isArray(orderItemIds) || orderItemIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "orderId and orderItemIds are required",
+      });
+    }
+
+    if (!status) {
+      return res.status(400).json({
+        success: false,
+        message: "status is required",
+      });
+    }
+
+// const validStatuses: OrderStatus[] = [
+//   "PLACED",
+//   "CONFIRMED",
+//   "SHIPPED",
+//   "DELIVERED",
+//   "CANCELLED",
+// ];
+
+// if (!validStatuses.includes(status)) {
+//   return res.status(400).json({
+//     success: false,
+//     message: "Invalid order status",
+//   });
+// }
+
+
+    // 🔁 Call service layer
+    const result = await sellerService.updateOrderItemStatusQuery(
+      orderId,
+      orderItemIds,
+      status as OrderStatus
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Order item status updated successfully",
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 export const sellerController = {
   postMedicine,
   updateMedicine,
   deleteMedicine,
   getSellerOrder,
-  sellerStatController
+  sellerStatController,
+  updateOrderItemStatus
 };
