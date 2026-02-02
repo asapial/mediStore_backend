@@ -20,7 +20,8 @@ const allowedOrigins = [
 
 const corsOptions = {
   // origin: allowedOrigins 
-  origin:  "http://localhost:3000" ,
+  // origin:  "http://localhost:3000" ,
+  origin: "https://medi-store-frontend-nine.vercel.app" ,
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],

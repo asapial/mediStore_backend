@@ -25,14 +25,202 @@ var init_class = __esm({
       "clientVersion": "7.3.0",
       "engineVersion": "9d6ad21cbbceab97458517b147a6a09ff43aa735",
       "activeProvider": "postgresql",
-      "inlineSchema": '// This is your Prisma schema file,\n// learn more about it in the docs: https://pris.ly/d/prisma-schema\n\n// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?\n// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init\n\ngenerator client {\n  provider = "prisma-client"\n  output   = "../generated/prisma"\n}\n\ndatasource db {\n  provider = "postgresql"\n}\n\nenum Role {\n  CUSTOMER\n  SELLER\n  ADMIN\n}\n\nenum OrderStatus {\n  PLACED\n  PROCESSING\n  SHIPPED\n  DELIVERED\n  CANCELLED\n}\n\nmodel User {\n  id        String   @id @default(cuid())\n  name      String\n  email     String   @unique\n  image     String?\n  // password  String \n  role      Role     @default(CUSTOMER)\n  isBanned  Boolean  @default(false)\n  createdAt DateTime @default(now())\n\n  medicines     Medicine[]\n  orders        Order[]\n  reviews       Review[]\n  emailVerified Boolean    @default(false)\n  updatedAt     DateTime   @updatedAt\n  sessions      Session[]\n  accounts      Account[]\n  // @@map("user")\n\n  @@map("user")\n}\n\nmodel Category {\n  id        String     @id @default(cuid())\n  name      String     @unique\n  medicines Medicine[]\n}\n\nmodel Medicine {\n  id           String   @id @default(cuid())\n  name         String\n  description  String\n  image        String?\n  price        Float\n  stock        Int\n  manufacturer String\n  sellerId     String\n  categoryId   String\n  createdAt    DateTime @default(now())\n\n  seller     User        @relation(fields: [sellerId], references: [id])\n  category   Category    @relation(fields: [categoryId], references: [id])\n  // category   String[]\n  reviews    Review[]\n  orderItems OrderItem[]\n}\n\nmodel Order {\n  id        String      @id @default(cuid())\n  userId    String\n  status    OrderStatus @default(PLACED)\n  address   String\n  createdAt DateTime    @default(now())\n\n  user  User        @relation(fields: [userId], references: [id])\n  items OrderItem[]\n}\n\nmodel OrderItem {\n  id         String @id @default(cuid())\n  orderId    String\n  medicineId String\n  quantity   Int\n  price      Float\n\n  order    Order    @relation(fields: [orderId], references: [id])\n  medicine Medicine @relation(fields: [medicineId], references: [id])\n}\n\nmodel Review {\n  id         String   @id @default(cuid())\n  rating     Int\n  comment    String\n  userId     String\n  medicineId String\n  createdAt  DateTime @default(now())\n\n  user     User     @relation(fields: [userId], references: [id])\n  medicine Medicine @relation(fields: [medicineId], references: [id])\n}\n\nmodel Session {\n  id        String   @id\n  expiresAt DateTime\n  token     String\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n  ipAddress String?\n  userAgent String?\n  userId    String\n  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)\n\n  @@unique([token])\n  @@index([userId])\n  @@map("session")\n}\n\nmodel Account {\n  id                    String    @id\n  accountId             String\n  providerId            String\n  userId                String\n  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)\n  accessToken           String?\n  refreshToken          String?\n  idToken               String?\n  accessTokenExpiresAt  DateTime?\n  refreshTokenExpiresAt DateTime?\n  scope                 String?\n  password              String?\n  createdAt             DateTime  @default(now())\n  updatedAt             DateTime  @updatedAt\n\n  @@index([userId])\n  @@map("account")\n}\n\nmodel Verification {\n  id         String   @id\n  identifier String\n  value      String\n  expiresAt  DateTime\n  createdAt  DateTime @default(now())\n  updatedAt  DateTime @updatedAt\n\n  @@index([identifier])\n  @@map("verification")\n}\n',
+      "inlineSchema": `// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  CUSTOMER
+  SELLER
+  ADMIN
+}
+
+enum OrderStatus {
+  PLACED
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  image     String?
+  // password  String 
+  role      Role     @default(CUSTOMER)
+  isBanned  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  medicines     Medicine[]
+  orders        Order[]
+  reviews       Review[]
+  emailVerified Boolean    @default(false)
+  updatedAt     DateTime   @updatedAt
+  sessions      Session[]
+  accounts      Account[]
+  // @@map("user")
+  cart          Cart?
+
+  @@map("user")
+}
+
+model Category {
+  id        String     @id @default(cuid())
+  name      String     @unique
+  medicines Medicine[]
+}
+
+model Medicine {
+  id           String   @id @default(cuid())
+  name         String
+  description  String
+  image        String?
+  price        Float
+  stock        Int
+  manufacturer String
+  sellerId     String
+  categoryId   String
+  createdAt    DateTime @default(now())
+
+  seller     User        @relation(fields: [sellerId], references: [id])
+  category   Category    @relation(fields: [categoryId], references: [id])
+  // category   String[]
+  reviews    Review[]
+  orderItems OrderItem[]
+  cartItems  CartItem[]
+}
+
+model Order {
+  id        String      @id @default(cuid())
+  userId    String
+  status    OrderStatus @default(PLACED)
+  address   String
+  createdAt DateTime    @default(now())
+
+  user  User        @relation(fields: [userId], references: [id])
+  items OrderItem[]
+}
+
+model OrderItem {
+  id         String      @id @default(cuid())
+  orderId    String
+  medicineId String
+  quantity   Int
+  status     OrderStatus @default(PLACED)
+  price      Float
+
+  order    Order    @relation(fields: [orderId], references: [id])
+  medicine Medicine @relation(fields: [medicineId], references: [id])
+}
+
+// Cart model for storing a user's active shopping cart
+model Cart {
+  id        String   @id @default(cuid())
+  userId    String   @unique // One cart per user
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user  User       @relation(fields: [userId], references: [id])
+  items CartItem[] // Cart items relation
+
+  @@map("cart")
+}
+
+// CartItem model for individual medicines in the cart
+model CartItem {
+  id         String   @id @default(cuid())
+  cartId     String
+  medicineId String
+  quantity   Int      @default(1)
+  addedAt    DateTime @default(now())
+
+  cart     Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  medicine Medicine @relation(fields: [medicineId], references: [id])
+
+  @@unique([cartId, medicineId]) // Prevent duplicate items for the same cart
+  @@map("cart_item")
+}
+
+model Review {
+  id         String   @id @default(cuid())
+  rating     Int
+  comment    String
+  userId     String
+  medicineId String
+  createdAt  DateTime @default(now())
+
+  user     User     @relation(fields: [userId], references: [id])
+  medicine Medicine @relation(fields: [medicineId], references: [id])
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([token])
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
+`,
       "runtimeDataModel": {
         "models": {},
         "enums": {},
         "types": {}
       }
     };
-    config.runtimeDataModel = JSON.parse('{"models":{"User":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"name","kind":"scalar","type":"String"},{"name":"email","kind":"scalar","type":"String"},{"name":"image","kind":"scalar","type":"String"},{"name":"role","kind":"enum","type":"Role"},{"name":"isBanned","kind":"scalar","type":"Boolean"},{"name":"createdAt","kind":"scalar","type":"DateTime"},{"name":"medicines","kind":"object","type":"Medicine","relationName":"MedicineToUser"},{"name":"orders","kind":"object","type":"Order","relationName":"OrderToUser"},{"name":"reviews","kind":"object","type":"Review","relationName":"ReviewToUser"},{"name":"emailVerified","kind":"scalar","type":"Boolean"},{"name":"updatedAt","kind":"scalar","type":"DateTime"},{"name":"sessions","kind":"object","type":"Session","relationName":"SessionToUser"},{"name":"accounts","kind":"object","type":"Account","relationName":"AccountToUser"}],"dbName":"user"},"Category":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"name","kind":"scalar","type":"String"},{"name":"medicines","kind":"object","type":"Medicine","relationName":"CategoryToMedicine"}],"dbName":null},"Medicine":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"name","kind":"scalar","type":"String"},{"name":"description","kind":"scalar","type":"String"},{"name":"image","kind":"scalar","type":"String"},{"name":"price","kind":"scalar","type":"Float"},{"name":"stock","kind":"scalar","type":"Int"},{"name":"manufacturer","kind":"scalar","type":"String"},{"name":"sellerId","kind":"scalar","type":"String"},{"name":"categoryId","kind":"scalar","type":"String"},{"name":"createdAt","kind":"scalar","type":"DateTime"},{"name":"seller","kind":"object","type":"User","relationName":"MedicineToUser"},{"name":"category","kind":"object","type":"Category","relationName":"CategoryToMedicine"},{"name":"reviews","kind":"object","type":"Review","relationName":"MedicineToReview"},{"name":"orderItems","kind":"object","type":"OrderItem","relationName":"MedicineToOrderItem"}],"dbName":null},"Order":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"userId","kind":"scalar","type":"String"},{"name":"status","kind":"enum","type":"OrderStatus"},{"name":"address","kind":"scalar","type":"String"},{"name":"createdAt","kind":"scalar","type":"DateTime"},{"name":"user","kind":"object","type":"User","relationName":"OrderToUser"},{"name":"items","kind":"object","type":"OrderItem","relationName":"OrderToOrderItem"}],"dbName":null},"OrderItem":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"orderId","kind":"scalar","type":"String"},{"name":"medicineId","kind":"scalar","type":"String"},{"name":"quantity","kind":"scalar","type":"Int"},{"name":"price","kind":"scalar","type":"Float"},{"name":"order","kind":"object","type":"Order","relationName":"OrderToOrderItem"},{"name":"medicine","kind":"object","type":"Medicine","relationName":"MedicineToOrderItem"}],"dbName":null},"Review":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"rating","kind":"scalar","type":"Int"},{"name":"comment","kind":"scalar","type":"String"},{"name":"userId","kind":"scalar","type":"String"},{"name":"medicineId","kind":"scalar","type":"String"},{"name":"createdAt","kind":"scalar","type":"DateTime"},{"name":"user","kind":"object","type":"User","relationName":"ReviewToUser"},{"name":"medicine","kind":"object","type":"Medicine","relationName":"MedicineToReview"}],"dbName":null},"Session":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"expiresAt","kind":"scalar","type":"DateTime"},{"name":"token","kind":"scalar","type":"String"},{"name":"createdAt","kind":"scalar","type":"DateTime"},{"name":"updatedAt","kind":"scalar","type":"DateTime"},{"name":"ipAddress","kind":"scalar","type":"String"},{"name":"userAgent","kind":"scalar","type":"String"},{"name":"userId","kind":"scalar","type":"String"},{"name":"user","kind":"object","type":"User","relationName":"SessionToUser"}],"dbName":"session"},"Account":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"accountId","kind":"scalar","type":"String"},{"name":"providerId","kind":"scalar","type":"String"},{"name":"userId","kind":"scalar","type":"String"},{"name":"user","kind":"object","type":"User","relationName":"AccountToUser"},{"name":"accessToken","kind":"scalar","type":"String"},{"name":"refreshToken","kind":"scalar","type":"String"},{"name":"idToken","kind":"scalar","type":"String"},{"name":"accessTokenExpiresAt","kind":"scalar","type":"DateTime"},{"name":"refreshTokenExpiresAt","kind":"scalar","type":"DateTime"},{"name":"scope","kind":"scalar","type":"String"},{"name":"password","kind":"scalar","type":"String"},{"name":"createdAt","kind":"scalar","type":"DateTime"},{"name":"updatedAt","kind":"scalar","type":"DateTime"}],"dbName":"account"},"Verification":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"identifier","kind":"scalar","type":"String"},{"name":"value","kind":"scalar","type":"String"},{"name":"expiresAt","kind":"scalar","type":"DateTime"},{"name":"createdAt","kind":"scalar","type":"DateTime"},{"name":"updatedAt","kind":"scalar","type":"DateTime"}],"dbName":"verification"}},"enums":{},"types":{}}');
+    config.runtimeDataModel = JSON.parse('{"models":{"User":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"name","kind":"scalar","type":"String"},{"name":"email","kind":"scalar","type":"String"},{"name":"image","kind":"scalar","type":"String"},{"name":"role","kind":"enum","type":"Role"},{"name":"isBanned","kind":"scalar","type":"Boolean"},{"name":"createdAt","kind":"scalar","type":"DateTime"},{"name":"medicines","kind":"object","type":"Medicine","relationName":"MedicineToUser"},{"name":"orders","kind":"object","type":"Order","relationName":"OrderToUser"},{"name":"reviews","kind":"object","type":"Review","relationName":"ReviewToUser"},{"name":"emailVerified","kind":"scalar","type":"Boolean"},{"name":"updatedAt","kind":"scalar","type":"DateTime"},{"name":"sessions","kind":"object","type":"Session","relationName":"SessionToUser"},{"name":"accounts","kind":"object","type":"Account","relationName":"AccountToUser"},{"name":"cart","kind":"object","type":"Cart","relationName":"CartToUser"}],"dbName":"user"},"Category":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"name","kind":"scalar","type":"String"},{"name":"medicines","kind":"object","type":"Medicine","relationName":"CategoryToMedicine"}],"dbName":null},"Medicine":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"name","kind":"scalar","type":"String"},{"name":"description","kind":"scalar","type":"String"},{"name":"image","kind":"scalar","type":"String"},{"name":"price","kind":"scalar","type":"Float"},{"name":"stock","kind":"scalar","type":"Int"},{"name":"manufacturer","kind":"scalar","type":"String"},{"name":"sellerId","kind":"scalar","type":"String"},{"name":"categoryId","kind":"scalar","type":"String"},{"name":"createdAt","kind":"scalar","type":"DateTime"},{"name":"seller","kind":"object","type":"User","relationName":"MedicineToUser"},{"name":"category","kind":"object","type":"Category","relationName":"CategoryToMedicine"},{"name":"reviews","kind":"object","type":"Review","relationName":"MedicineToReview"},{"name":"orderItems","kind":"object","type":"OrderItem","relationName":"MedicineToOrderItem"},{"name":"cartItems","kind":"object","type":"CartItem","relationName":"CartItemToMedicine"}],"dbName":null},"Order":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"userId","kind":"scalar","type":"String"},{"name":"status","kind":"enum","type":"OrderStatus"},{"name":"address","kind":"scalar","type":"String"},{"name":"createdAt","kind":"scalar","type":"DateTime"},{"name":"user","kind":"object","type":"User","relationName":"OrderToUser"},{"name":"items","kind":"object","type":"OrderItem","relationName":"OrderToOrderItem"}],"dbName":null},"OrderItem":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"orderId","kind":"scalar","type":"String"},{"name":"medicineId","kind":"scalar","type":"String"},{"name":"quantity","kind":"scalar","type":"Int"},{"name":"status","kind":"enum","type":"OrderStatus"},{"name":"price","kind":"scalar","type":"Float"},{"name":"order","kind":"object","type":"Order","relationName":"OrderToOrderItem"},{"name":"medicine","kind":"object","type":"Medicine","relationName":"MedicineToOrderItem"}],"dbName":null},"Cart":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"userId","kind":"scalar","type":"String"},{"name":"createdAt","kind":"scalar","type":"DateTime"},{"name":"updatedAt","kind":"scalar","type":"DateTime"},{"name":"user","kind":"object","type":"User","relationName":"CartToUser"},{"name":"items","kind":"object","type":"CartItem","relationName":"CartToCartItem"}],"dbName":"cart"},"CartItem":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"cartId","kind":"scalar","type":"String"},{"name":"medicineId","kind":"scalar","type":"String"},{"name":"quantity","kind":"scalar","type":"Int"},{"name":"addedAt","kind":"scalar","type":"DateTime"},{"name":"cart","kind":"object","type":"Cart","relationName":"CartToCartItem"},{"name":"medicine","kind":"object","type":"Medicine","relationName":"CartItemToMedicine"}],"dbName":"cart_item"},"Review":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"rating","kind":"scalar","type":"Int"},{"name":"comment","kind":"scalar","type":"String"},{"name":"userId","kind":"scalar","type":"String"},{"name":"medicineId","kind":"scalar","type":"String"},{"name":"createdAt","kind":"scalar","type":"DateTime"},{"name":"user","kind":"object","type":"User","relationName":"ReviewToUser"},{"name":"medicine","kind":"object","type":"Medicine","relationName":"MedicineToReview"}],"dbName":null},"Session":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"expiresAt","kind":"scalar","type":"DateTime"},{"name":"token","kind":"scalar","type":"String"},{"name":"createdAt","kind":"scalar","type":"DateTime"},{"name":"updatedAt","kind":"scalar","type":"DateTime"},{"name":"ipAddress","kind":"scalar","type":"String"},{"name":"userAgent","kind":"scalar","type":"String"},{"name":"userId","kind":"scalar","type":"String"},{"name":"user","kind":"object","type":"User","relationName":"SessionToUser"}],"dbName":"session"},"Account":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"accountId","kind":"scalar","type":"String"},{"name":"providerId","kind":"scalar","type":"String"},{"name":"userId","kind":"scalar","type":"String"},{"name":"user","kind":"object","type":"User","relationName":"AccountToUser"},{"name":"accessToken","kind":"scalar","type":"String"},{"name":"refreshToken","kind":"scalar","type":"String"},{"name":"idToken","kind":"scalar","type":"String"},{"name":"accessTokenExpiresAt","kind":"scalar","type":"DateTime"},{"name":"refreshTokenExpiresAt","kind":"scalar","type":"DateTime"},{"name":"scope","kind":"scalar","type":"String"},{"name":"password","kind":"scalar","type":"String"},{"name":"createdAt","kind":"scalar","type":"DateTime"},{"name":"updatedAt","kind":"scalar","type":"DateTime"}],"dbName":"account"},"Verification":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"identifier","kind":"scalar","type":"String"},{"name":"value","kind":"scalar","type":"String"},{"name":"expiresAt","kind":"scalar","type":"DateTime"},{"name":"createdAt","kind":"scalar","type":"DateTime"},{"name":"updatedAt","kind":"scalar","type":"DateTime"}],"dbName":"verification"}},"enums":{},"types":{}}');
     config.compilerWasm = {
       getRuntime: async () => await import("@prisma/client/runtime/query_compiler_fast_bg.postgresql.mjs"),
       getQueryCompilerWasmModule: async () => {
@@ -171,18 +359,19 @@ var init_seller_types = __esm({
 
 // src/module/seller/seller.service.ts
 import { ZodError } from "zod";
-var postMedicineQuery, updateMedicineQuery, deleteMedicineQuery, getSellerOrderQuery, getSellerStats, sellerService;
+var postMedicineQuery, updateMedicineQuery, deleteMedicineQuery, getSellerOrderQuery, getSellerStats, updateOrderItemStatusQuery, sellerService;
 var init_seller_service = __esm({
   "src/module/seller/seller.service.ts"() {
     "use strict";
     init_prisma();
     init_seller_types();
-    postMedicineQuery = async (data) => {
+    postMedicineQuery = async (data, sellerId) => {
       try {
+        console.log(sellerId);
         const validatedData = postMedicineSchema.parse(data);
         const prismaData = {
           ...validatedData,
-          sellerId: "uEfEn65DfNiK2pD9a1krMZPAomg5WolQ",
+          sellerId,
           image: validatedData.image ?? null
           // Prisma expects string | null
         };
@@ -234,47 +423,42 @@ var init_seller_service = __esm({
       return result;
     };
     getSellerOrderQuery = async (id) => {
-      const result = await prisma.order.findMany({
-        where: {
-          items: {
-            some: {
-              medicine: {
-                sellerId: id
-              }
-            }
-          }
-        },
+      console.log("sessss", id);
+      const orders = await prisma.order.findMany({
         include: {
           items: {
-            where: {
-              medicine: {
-                sellerId: id
-              }
-            },
-            include: {
-              medicine: {
-                select: {
-                  name: true,
-                  description: true,
-                  price: true,
-                  image: true,
-                  seller: true
-                }
-              }
-            }
-          },
-          user: {
             select: {
               id: true,
-              name: true,
-              email: true,
-              image: true
+              orderId: true,
+              medicineId: true,
+              quantity: true,
+              price: true,
+              status: true,
+              medicine: {
+                select: {
+                  sellerId: true,
+                  name: true
+                }
+              }
             }
           }
         }
       });
-      console.log(result);
-      return result;
+      console.log(orders);
+      const filteredOrders = orders.flatMap((order) => {
+        const items = order.items.filter(
+          (item) => item.medicine?.sellerId === id
+        );
+        if (!items.length) return [];
+        return [{
+          id: order.id,
+          status: order.status,
+          address: order.address,
+          createdAt: order.createdAt,
+          items
+        }];
+      });
+      return filteredOrders;
     };
     getSellerStats = async (sellerId) => {
       const LOW_STOCK_THRESHOLD = 10;
@@ -404,19 +588,45 @@ var init_seller_service = __esm({
         thisMonthRevenue
       };
     };
+    updateOrderItemStatusQuery = async (orderId, orderItemsList, status) => {
+      await prisma.orderItem.updateMany({
+        where: {
+          id: { in: orderItemsList },
+          orderId
+        },
+        data: {
+          status
+          // ✅ pass the enum, not string
+        }
+      });
+      const remaining = await prisma.orderItem.count({
+        where: {
+          orderId,
+          status: { not: status }
+        }
+      });
+      if (remaining === 0) {
+        await prisma.order.update({
+          where: { id: orderId },
+          data: { status }
+        });
+      }
+      return { success: true };
+    };
     sellerService = {
       postMedicineQuery,
       updateMedicineQuery,
       deleteMedicineQuery,
       getSellerOrderQuery,
-      getSellerStats
+      getSellerStats,
+      updateOrderItemStatusQuery
     };
   }
 });
 
 // src/module/seller/seller.controller.ts
 import { ZodError as ZodError2 } from "zod";
-var postMedicine, updateMedicine, deleteMedicine, getSellerOrder, sellerStatController, sellerController;
+var postMedicine, updateMedicine, deleteMedicine, getSellerOrder, sellerStatController, updateOrderItemStatus, sellerController;
 var init_seller_controller = __esm({
   "src/module/seller/seller.controller.ts"() {
     "use strict";
@@ -424,7 +634,9 @@ var init_seller_controller = __esm({
     postMedicine = async (req, res, next) => {
       try {
         const data = req.body;
-        const result = await sellerService.postMedicineQuery(data);
+        const sellerId = req.user.id;
+        console.log(sellerId);
+        const result = await sellerService.postMedicineQuery(data, sellerId);
         res.status(201).json({
           message: "Medicine Added Successfully",
           data: result
@@ -525,12 +737,43 @@ var init_seller_controller = __esm({
         next(error);
       }
     };
+    updateOrderItemStatus = async (req, res, next) => {
+      try {
+        const { orderId, orderItemIds, status } = req.body;
+        console.log(orderId, orderItemIds, status);
+        if (!orderId || !Array.isArray(orderItemIds) || orderItemIds.length === 0) {
+          return res.status(400).json({
+            success: false,
+            message: "orderId and orderItemIds are required"
+          });
+        }
+        if (!status) {
+          return res.status(400).json({
+            success: false,
+            message: "status is required"
+          });
+        }
+        const result = await sellerService.updateOrderItemStatusQuery(
+          orderId,
+          orderItemIds,
+          status
+        );
+        return res.status(200).json({
+          success: true,
+          message: "Order item status updated successfully",
+          data: result
+        });
+      } catch (error) {
+        next(error);
+      }
+    };
     sellerController = {
       postMedicine,
       updateMedicine,
       deleteMedicine,
       getSellerOrder,
-      sellerStatController
+      sellerStatController,
+      updateOrderItemStatus
     };
   }
 });
@@ -586,11 +829,12 @@ var init_seller_route = __esm({
     init_seller_controller();
     init_auth_middleware();
     router = Router();
-    router.post("/medicines", sellerController.postMedicine);
+    router.post("/medicines", auth_middleware_default(), sellerController.postMedicine);
     router.put("/medicines/:id", sellerController.updateMedicine);
     router.delete("/medicines/:id", sellerController.deleteMedicine);
     router.get("/orders", auth_middleware_default(), sellerController.getSellerOrder);
     router.get("/stat", auth_middleware_default(), sellerController.sellerStatController);
+    router.put("/orders", sellerController.updateOrderItemStatus);
     sellerRouter = router;
   }
 });
@@ -781,7 +1025,7 @@ var init_order_route = __esm({
 });
 
 // src/module/admin/admin.service.ts
-var getAllUsersQuery, getAllCategoryQuery, getUserDetailsQuery, updateUserQuery, updateCategoryQuery, adminService;
+var getAllUsersQuery, getAllCategoryQuery, getUserDetailsQuery, updateUserQuery, updateCategoryQuery, getAdminStatsService, getAllOrder, banUserService, updateUserByAdmin, adminService;
 var init_admin_service = __esm({
   "src/module/admin/admin.service.ts"() {
     "use strict";
@@ -848,18 +1092,132 @@ var init_admin_service = __esm({
       });
       return result;
     };
+    getAdminStatsService = async () => {
+      const totalUsers = await prisma.user.count();
+      const totalCustomers = await prisma.user.count({ where: { role: "CUSTOMER" } });
+      const totalSellers = await prisma.user.count({ where: { role: "SELLER" } });
+      const totalAdmins = await prisma.user.count({ where: { role: "ADMIN" } });
+      const totalMedicines = await prisma.medicine.count();
+      const totalOrders = await prisma.order.count();
+      const placedOrders = await prisma.order.count({ where: { status: "PLACED" } });
+      const processingOrders = await prisma.order.count({ where: { status: "PROCESSING" } });
+      const shippedOrders = await prisma.order.count({ where: { status: "SHIPPED" } });
+      const deliveredOrders = await prisma.order.count({ where: { status: "DELIVERED" } });
+      const cancelledOrders = await prisma.order.count({ where: { status: "CANCELLED" } });
+      const totalCartItems = await prisma.cartItem.count();
+      const totalCartQuantity = await prisma.cartItem.aggregate({
+        _sum: { quantity: true }
+      });
+      const totalReviews = await prisma.review.count();
+      const averageRating = await prisma.review.aggregate({
+        _avg: { rating: true }
+      });
+      return {
+        users: { total: totalUsers, customers: totalCustomers, sellers: totalSellers, admins: totalAdmins },
+        medicines: { total: totalMedicines },
+        orders: {
+          total: totalOrders,
+          placed: placedOrders,
+          processing: processingOrders,
+          shipped: shippedOrders,
+          delivered: deliveredOrders,
+          cancelled: cancelledOrders
+        },
+        cart: { totalItems: totalCartItems, totalQuantity: totalCartQuantity._sum.quantity || 0 },
+        reviews: { total: totalReviews, averageRating: averageRating._avg.rating || 0 }
+      };
+    };
+    getAllOrder = async () => {
+      const result = await prisma.order.findMany({
+        include: {
+          items: {
+            select: {
+              id: true,
+              medicineId: true,
+              quantity: true,
+              status: true,
+              price: true,
+              medicine: {
+                select: {
+                  id: true,
+                  name: true,
+                  image: true,
+                  manufacturer: true,
+                  seller: {
+                    select: {
+                      id: true,
+                      name: true,
+                      image: true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      });
+      return result;
+    };
+    banUserService = async (userId, ban) => {
+      const user = await prisma.user.findUnique({
+        where: { id: userId }
+      });
+      if (!user) {
+        throw new Error("User not found");
+      }
+      const updatedUser = await prisma.user.update({
+        where: { id: userId },
+        data: {
+          isBanned: ban
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          isBanned: true,
+          updatedAt: true
+        }
+      });
+      return updatedUser;
+    };
+    updateUserByAdmin = async (userId, payload) => {
+      const data = {};
+      if (payload.name !== void 0) {
+        data.name = payload.name;
+      }
+      if (payload.role !== void 0) {
+        data.role = payload.role;
+      }
+      return prisma.user.update({
+        where: { id: userId },
+        data,
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          isBanned: true,
+          updatedAt: true
+        }
+      });
+    };
     adminService = {
       getAllUsersQuery,
       getAllCategoryQuery,
       updateUserQuery,
       updateCategoryQuery,
-      getUserDetailsQuery
+      getUserDetailsQuery,
+      getAdminStatsService,
+      getAllOrder,
+      banUserService,
+      updateUserByAdmin
     };
   }
 });
 
 // src/module/admin/admin.controller.ts
-var getAllUsers, getUserDetails, getAllCategory, updateUser, updateCategory, adminController;
+var getAllUsers, getUserDetails, getAllCategory, updateUser, updateCategory, getAdminStatsController, getAllOrder2, banUserController, adminUpdateUser, adminController;
 var init_admin_controller = __esm({
   "src/module/admin/admin.controller.ts"() {
     "use strict";
@@ -961,12 +1319,84 @@ var init_admin_controller = __esm({
         });
       }
     };
+    getAdminStatsController = async (req, res, next) => {
+      try {
+        const stats = await adminService.getAdminStatsService();
+        res.status(200).json({
+          success: true,
+          message: "Admin stats fetched successfully",
+          data: stats
+        });
+      } catch (err) {
+        next(err);
+      }
+    };
+    getAllOrder2 = async (req, res, next) => {
+      try {
+        const order = await adminService.getAllOrder();
+        res.status(200).json({
+          success: true,
+          message: "Order fetched successfully",
+          data: order
+        });
+      } catch (err) {
+        next(err);
+      }
+    };
+    banUserController = async (req, res, next) => {
+      try {
+        if (!req.user || req.user.role !== "ADMIN") {
+          return res.status(403).json({ message: "Forbidden" });
+        }
+        const { userId } = req.params;
+        const { ban } = req.body;
+        if (typeof ban !== "boolean") {
+          return res.status(400).json({ message: "Ban must be boolean" });
+        }
+        const user = await adminService.banUserService(userId, ban);
+        res.status(200).json({
+          success: true,
+          message: ban ? "User banned successfully" : "User unbanned successfully",
+          data: user
+        });
+      } catch (error) {
+        next(error);
+      }
+    };
+    adminUpdateUser = async (req, res) => {
+      try {
+        const userId = req.params.id;
+        const { name, role } = req.body;
+        if (!name && !role) {
+          return res.status(400).json({
+            status: false,
+            message: "Nothing to update"
+          });
+        }
+        const user = await adminService.updateUserByAdmin(userId, { name, role });
+        return res.status(200).json({
+          status: true,
+          message: "User updated successfully",
+          data: user
+        });
+      } catch (error) {
+        console.error(error);
+        return res.status(500).json({
+          status: false,
+          message: error.message || "Failed to update user"
+        });
+      }
+    };
     adminController = {
       getAllUsers,
       getAllCategory,
       updateUser,
       updateCategory,
-      getUserDetails
+      getUserDetails,
+      getAdminStatsController,
+      getAllOrder: getAllOrder2,
+      banUserController,
+      adminUpdateUser
     };
   }
 });
@@ -978,18 +1408,27 @@ var init_admin_route = __esm({
   "src/module/admin/admin.route.ts"() {
     "use strict";
     init_admin_controller();
+    init_auth_middleware();
     router3 = Router3();
     router3.get("/users", adminController.getAllUsers);
     router3.get("/users/:id", adminController.getUserDetails);
     router3.get("/categories", adminController.getAllCategory);
-    router3.put("/users/:id", adminController.updateUser);
     router3.put("/categories/:id", adminController.updateCategory);
+    router3.put("/users/:id", adminController.updateUser);
+    router3.get("/stats", auth_middleware_default(), adminController.getAdminStatsController);
+    router3.get("/order", adminController.getAllOrder);
+    router3.patch(
+      "/users/:userId/ban",
+      auth_middleware_default(),
+      adminController.banUserController
+    );
+    router3.patch("/users/:id", auth_middleware_default(), adminController.adminUpdateUser);
     adminRouter = router3;
   }
 });
 
 // src/module/auth/auth.controller.ts
-var registerController, loginController, meController, authController;
+var registerController, loginController, meController, updateProfileController, authController;
 var init_auth_controller = __esm({
   "src/module/auth/auth.controller.ts"() {
     "use strict";
@@ -1048,7 +1487,8 @@ var init_auth_controller = __esm({
             name: true,
             email: true,
             image: true,
-            role: true
+            role: true,
+            createdAt: true
           }
         });
         if (!user) {
@@ -1059,10 +1499,54 @@ var init_auth_controller = __esm({
         next(error);
       }
     };
+    updateProfileController = async (req, res, next) => {
+      try {
+        if (!req.user || !req.user.id) {
+          return res.status(401).json({ message: "Unauthorized" });
+        }
+        const userId = req.user.id;
+        const { name, email, image } = req.body;
+        if (!name || !email) {
+          return res.status(400).json({ message: "Name and email are required" });
+        }
+        const existingUser = await prisma.user.findUnique({
+          where: { email }
+        });
+        if (existingUser && existingUser.id !== userId) {
+          return res.status(400).json({ message: "Email is already in use" });
+        }
+        const updatedUser = await prisma.user.update({
+          where: { id: userId },
+          data: {
+            name,
+            email,
+            image: image || null
+            // allow clearing the image
+          },
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            image: true,
+            role: true,
+            createdAt: true,
+            updatedAt: true
+          }
+        });
+        res.status(200).json({
+          success: true,
+          message: "Profile updated successfully",
+          user: updatedUser
+        });
+      } catch (error) {
+        next(error);
+      }
+    };
     authController = {
       registerController,
       loginController,
-      meController
+      meController,
+      updateProfileController
     };
   }
 });
@@ -1079,6 +1563,7 @@ var init_auth_route = __esm({
     router4.post("/register", authController.registerController);
     router4.post("/login", authController.loginController);
     router4.get("/me", auth_middleware_default(["CUSTOMER", "SELLER", "ADMIN"]), authController.meController);
+    router4.patch("/update", auth_middleware_default(), authController.updateProfileController);
     authRouter = router4;
   }
 });
@@ -1245,6 +1730,243 @@ var init_medicine_router = __esm({
   }
 });
 
+// src/module/cart/cart.service.ts
+var addToCartService, getMedicineCartStatus, getFromCartService, updateCartItemService, removeCartItemService, cartService;
+var init_cart_service = __esm({
+  "src/module/cart/cart.service.ts"() {
+    "use strict";
+    init_prisma();
+    addToCartService = async (userId, medicineId, quantity = 1) => {
+      console.log(userId, medicineId, quantity);
+      let cart = await prisma.cart.findUnique({ where: { userId } });
+      if (!cart) {
+        cart = await prisma.cart.create({
+          data: { userId }
+        });
+      }
+      const cartItem = await prisma.cartItem.upsert({
+        where: {
+          cartId_medicineId: {
+            cartId: cart.id,
+            medicineId
+          }
+        },
+        update: {
+          quantity: {
+            increment: quantity
+          }
+        },
+        create: {
+          cartId: cart.id,
+          medicineId,
+          quantity
+        }
+      });
+      console.log(cartItem);
+      return cartItem;
+    };
+    getMedicineCartStatus = async (userId, medicineId) => {
+      const cart = await prisma.cart.findUnique({
+        where: { userId },
+        include: { items: true }
+      });
+      if (!cart) {
+        return { inCart: false, quantity: 0 };
+      }
+      const cartItem = cart.items.find((item) => item.medicineId === medicineId);
+      if (!cartItem) {
+        return { inCart: false, quantity: 0 };
+      }
+      return { inCart: true, quantity: cartItem.quantity };
+    };
+    getFromCartService = async (userId) => {
+      const cart = await prisma.cart.findUnique({
+        where: { userId },
+        // ✅ userId exists on Cart
+        include: {
+          items: {
+            include: {
+              medicine: true
+            }
+          }
+        }
+      });
+      if (!cart) return { items: [], totalQuantity: 0, totalPrice: 0 };
+      const totalQuantity = cart.items.reduce((sum, item) => sum + item.quantity, 0);
+      const totalPrice = cart.items.reduce((sum, item) => sum + item.quantity * item.medicine.price, 0);
+      return {
+        items: cart.items,
+        totalQuantity,
+        totalPrice
+      };
+    };
+    updateCartItemService = async (userId, itemId, quantity) => {
+      if (quantity < 1) {
+        throw new Error("Quantity must be at least 1");
+      }
+      const cartItem = await prisma.cartItem.findUnique({
+        where: { id: itemId },
+        include: { medicine: true }
+      });
+      if (!cartItem) throw new Error("Cart item not found");
+      if (quantity > cartItem.medicine.stock) {
+        throw new Error("Quantity exceeds available stock");
+      }
+      const updated = await prisma.cartItem.update({
+        where: { id: itemId },
+        data: { quantity },
+        include: { medicine: true }
+      });
+      console.log(updated);
+      return updated;
+    };
+    removeCartItemService = async (userId, itemId) => {
+      const cartItem = await prisma.cartItem.findUnique({
+        where: { id: itemId }
+      });
+      if (!cartItem) throw new Error("Cart item not found");
+      const cart = await prisma.cart.findUnique({
+        where: { id: cartItem.cartId }
+      });
+      if (!cart || cart.userId !== userId) throw new Error("Unauthorized");
+      await prisma.cartItem.delete({
+        where: { id: itemId }
+      });
+      return { success: true, message: "Cart item removed successfully" };
+    };
+    cartService = {
+      addToCartService,
+      getMedicineCartStatus,
+      getFromCartService,
+      updateCartItemService,
+      removeCartItemService
+    };
+  }
+});
+
+// src/module/cart/cart.controller.ts
+var addToCartController, getMedicineCartStatusController, getFromCartController, updateCartItemController, removeCartItemController, cartController;
+var init_cart_controller = __esm({
+  "src/module/cart/cart.controller.ts"() {
+    "use strict";
+    init_cart_service();
+    addToCartController = async (req, res, next) => {
+      try {
+        const { medicineId, quantity } = req.body;
+        console.log(medicineId, quantity);
+        if (!medicineId) {
+          return res.status(400).json({
+            success: false,
+            message: "medicineId is required"
+          });
+        }
+        const userId = req.user.id;
+        const cartItem = await cartService.addToCartService(userId, medicineId, quantity || 1);
+        return res.status(200).json({
+          success: true,
+          message: "Item added to cart",
+          data: cartItem
+        });
+      } catch (error) {
+        next(error);
+      }
+    };
+    getMedicineCartStatusController = async (req, res, next) => {
+      try {
+        const userId = req.user?.id;
+        const medicineId = req.params.medicineId;
+        if (!userId || !medicineId) {
+          return res.status(400).json({
+            success: false,
+            message: "User ID and Medicine ID are required"
+          });
+        }
+        const status = await cartService.getMedicineCartStatus(userId, medicineId);
+        return res.status(200).json({
+          success: true,
+          data: status
+        });
+      } catch (err) {
+        next(err);
+      }
+    };
+    getFromCartController = async (req, res, next) => {
+      try {
+        const userId = req.user?.id;
+        if (!userId) {
+          return res.status(401).json({
+            success: false,
+            message: "Unauthorized"
+          });
+        }
+        const cart = await cartService.getFromCartService(userId);
+        return res.status(200).json({
+          success: true,
+          message: "Cart fetched successfully",
+          data: cart
+        });
+      } catch (error) {
+        next(error);
+      }
+    };
+    updateCartItemController = async (req, res, next) => {
+      try {
+        const userId = req.user.id;
+        const { itemId, quantity } = req.body;
+        if (!itemId || quantity === void 0) {
+          return res.status(400).json({ success: false, message: "itemId and quantity are required" });
+        }
+        const updatedItem = await cartService.updateCartItemService(userId, itemId, quantity);
+        return res.status(200).json({
+          success: true,
+          message: "Cart item updated successfully",
+          data: updatedItem
+        });
+      } catch (error) {
+        next(error);
+      }
+    };
+    removeCartItemController = async (req, res, next) => {
+      try {
+        const userId = req.user.id;
+        const { itemId } = req.body;
+        if (!itemId) {
+          return res.status(400).json({ success: false, message: "itemId is required" });
+        }
+        const result = await cartService.removeCartItemService(userId, itemId);
+        return res.status(200).json(result);
+      } catch (error) {
+        next(error);
+      }
+    };
+    cartController = {
+      addToCartController,
+      getMedicineCartStatusController,
+      getFromCartController,
+      updateCartItemController,
+      removeCartItemController
+    };
+  }
+});
+
+// src/module/cart/cart.router.ts
+import { Router as Router6 } from "express";
+var router6, cartRouter;
+var init_cart_router = __esm({
+  "src/module/cart/cart.router.ts"() {
+    "use strict";
+    init_auth_middleware();
+    init_cart_controller();
+    router6 = Router6();
+    router6.get("/", auth_middleware_default(), cartController.getFromCartController);
+    router6.post("/add", auth_middleware_default(), cartController.addToCartController);
+    router6.get("/status/:medicineId", auth_middleware_default(), cartController.getMedicineCartStatusController);
+    router6.patch("/update", auth_middleware_default(), cartController.updateCartItemController);
+    router6.delete("/remove", auth_middleware_default(), cartController.removeCartItemController);
+    cartRouter = router6;
+  }
+});
+
 // src/app.ts
 import express from "express";
 import cors from "cors";
@@ -1260,8 +1982,11 @@ var init_app = __esm({
     init_admin_route();
     init_auth_route();
     init_medicine_router();
+    init_cart_router();
     app = express();
     corsOptions = {
+      // origin: allowedOrigins 
+      // origin:  "http://localhost:3000" ,
       origin: "https://medi-store-frontend-nine.vercel.app",
       credentials: true,
       methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
@@ -1276,6 +2001,7 @@ var init_app = __esm({
     app.use("/api/orders", orderRouter);
     app.use("/api/admin", adminRouter);
     app.use("/api/medicines", medicineRouter);
+    app.use("/api/cart", cartRouter);
     app.all("/api/auth/*splat", toNodeHandler(auth));
     app.get("/", (req, res) => {
       res.status(200).json({

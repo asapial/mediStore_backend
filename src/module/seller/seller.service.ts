@@ -314,6 +314,7 @@ const updateOrderItemStatusQuery = async (
         },
     });
 
+
     if (remaining === 0) {
         await prisma.order.update({
             where: { id: orderId },
