@@ -90,6 +90,7 @@ const meController = async (
         email: true,
         image: true,
         role: true,
+        createdAt:true
       },
     });
 
@@ -103,8 +104,68 @@ const meController = async (
   }
 };
 
+
+const updateProfileController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    // 1️⃣ Check if user is logged in
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const userId = req.user.id;
+    const { name, email, image } = req.body;
+
+    // 2️⃣ Basic validation
+    if (!name || !email) {
+      return res.status(400).json({ message: "Name and email are required" });
+    }
+
+    // 3️⃣ Check if email is already used by another user
+    const existingUser = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (existingUser && existingUser.id !== userId) {
+      return res.status(400).json({ message: "Email is already in use" });
+    }
+
+    // 4️⃣ Update user in database
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        name,
+        email,
+        image: image || null, // allow clearing the image
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        image: true,
+        role: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    // 5️⃣ Return updated user
+    res.status(200).json({
+      success: true,
+      message: "Profile updated successfully",
+      user: updatedUser,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const authController = {
   registerController,
   loginController,
   meController,
+  updateProfileController
 };

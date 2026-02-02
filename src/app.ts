@@ -8,6 +8,7 @@ import { adminRouter } from "./module/admin/admin.route";
 import { authRouter } from "./module/auth/auth.route";
 import cookieParser from "cookie-parser";
 import { medicineRouter } from "./module/medicine/medicine.router";
+import { cartRouter } from "./module/cart/cart.router";
 
 const app: Application = express();
 
@@ -36,6 +37,7 @@ app.use("/api/seller", sellerRouter);
 app.use("/api/orders", orderRouter);
 app.use("/api/admin", adminRouter);
 app.use("/api/medicines", medicineRouter);
+app.use("/api/cart", cartRouter);
 
 // Better Auth middleware
 app.all("/api/auth/*splat", toNodeHandler(auth));

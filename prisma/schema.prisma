@@ -44,13 +44,15 @@ model User {
   updatedAt     DateTime   @updatedAt
   sessions      Session[]
   accounts      Account[]
-  @@map("user")
   // @@map("user")
+  cart          Cart?
+
+  @@map("user")
 }
 
 model Category {
-  id   String @id @default(cuid())
-  name String @unique
+  id        String     @id @default(cuid())
+  name      String     @unique
   medicines Medicine[]
 }
 
@@ -71,6 +73,7 @@ model Medicine {
   // category   String[]
   reviews    Review[]
   orderItems OrderItem[]
+  cartItems  CartItem[]
 }
 
 model Order {
@@ -85,15 +88,44 @@ model Order {
 }
 
 model OrderItem {
-  id         String @id @default(cuid())
+  id         String      @id @default(cuid())
   orderId    String
   medicineId String
   quantity   Int
-  status    OrderStatus @default(PLACED)
+  status     OrderStatus @default(PLACED)
   price      Float
 
   order    Order    @relation(fields: [orderId], references: [id])
   medicine Medicine @relation(fields: [medicineId], references: [id])
+}
+
+// Cart model for storing a user's active shopping cart
+model Cart {
+  id        String   @id @default(cuid())
+  userId    String   @unique // One cart per user
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user  User       @relation(fields: [userId], references: [id])
+  items CartItem[] // Cart items relation
+
+  
+  @@map("cart")
+}
+
+// CartItem model for individual medicines in the cart
+model CartItem {
+  id         String   @id @default(cuid())
+  cartId     String
+  medicineId String
+  quantity   Int      @default(1)
+  addedAt    DateTime @default(now())
+
+  cart     Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  medicine Medicine @relation(fields: [medicineId], references: [id])
+
+  @@unique([cartId, medicineId]) // Prevent duplicate items for the same cart
+    @@map("cart_item")
 }
 
 model Review {
