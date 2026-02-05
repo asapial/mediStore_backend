@@ -94,8 +94,7 @@ model OrderItem {
   quantity   Int
   status     OrderStatus @default(PLACED)
   price      Float
-
-  order    Order    @relation(fields: [orderId], references: [id])
+  order    Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
   medicine Medicine @relation(fields: [medicineId], references: [id])
 }
 

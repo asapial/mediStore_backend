@@ -61,7 +61,7 @@ const getUserOrdersQuery = async (userId: string) => {
                             description: true,
                             price: true,
                             image: true,
-                            sellerId:true
+                            sellerId: true
                         }
                     }
                 }
@@ -94,13 +94,36 @@ const getOrderDetailsQuery = async (orderId: string) => {
         }
     })
 
-    if(!result){
+    if (!result) {
         throw new Error("Order not found");
     }
 
     return result;
 }
 
+const deleteOrderByCustomer = async (orderId: string) => {
+    // Fetch order first
+    const order = await prisma.order.findUnique({
+        where: { 
+            id:orderId 
+        },
+    });
+
+    if (!order) {
+        throw new Error("Order not found");
+    }
+
+    if (order.status === "DELIVERED" || order.status === "CANCELLED") {
+        throw new Error("Cannot delete delivered or cancelled orders");
+    }
+
+    // Delete the order
+    await prisma.order.delete({
+        where: { id: orderId },
+    });
+
+    return { message: "Order deleted successfully" };
+}
 
 
 
@@ -109,5 +132,6 @@ const getOrderDetailsQuery = async (orderId: string) => {
 export const orderService = {
     postOrderQuery,
     getUserOrdersQuery,
-    getOrderDetailsQuery
+    getOrderDetailsQuery,
+    deleteOrderByCustomer
 }

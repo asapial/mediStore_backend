@@ -53,12 +53,12 @@ const loginController = async (
     });
 
     // ✅ Forward the Set-Cookie header from BetterAuth to browser
-    const setCookie = headers.get("set-cookie");
-    console.log("Data form login controller:", setCookie)
-    if (setCookie) {
-      res.setHeader("Set-Cookie", setCookie);
-    }
+    const cookies =
+      headers.getSetCookie?.() ?? headers.get("set-cookie");
 
+    if (cookies) {
+      res.setHeader("Set-Cookie", cookies);
+    }
     res.status(200).json({
       message: "Login successful",
       user: response.user,
@@ -90,7 +90,7 @@ const meController = async (
         email: true,
         image: true,
         role: true,
-        createdAt:true
+        createdAt: true
       },
     });
 

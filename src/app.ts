@@ -14,21 +14,56 @@ const app: Application = express();
 
 // ✅ CORS setup (must be FIRST)
 const allowedOrigins = [
-  "http://localhost:3000" 
-  //  "https://medi-store-frontend-nine.vercel.app"
-];
+  "http://localhost:3000", 
+  //  "https://medi-store-frontend-khaki.vercel.app"
+].filter(Boolean);
 
 const corsOptions = {
-  // origin: allowedOrigins 
+  origin: allowedOrigins ,
   // origin:  "http://localhost:3000" ,
-  origin: "https://medi-store-frontend-nine.vercel.app" ,
+  // origin: "https://medi-store-frontend-khaki.vercel.app" ,
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
   optionsSuccessStatus: 200,
 };
 
-app.use(cors(corsOptions));
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (mobile apps, Postman, etc.)
+      if (!origin) return callback(null, true);
+
+      // Check if origin is in allowedOrigins or matches Vercel preview pattern
+      const isAllowed =
+        allowedOrigins.includes(origin) ||
+        /^https:\/\/next-blog-client.*\.vercel\.app$/.test(origin) ||
+        /^https:\/\/.*\.vercel\.app$/.test(origin); // Any Vercel deployment
+
+      if (isAllowed) {
+        callback(null, true);
+      } else {
+        callback(new Error(`Origin ${origin} not allowed by CORS`));
+      }
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "Cookie"],
+    exposedHeaders: ["Set-Cookie"],
+  }),
+);
+// const corsOptions = {
+//   // origin: allowedOrigins ,
+//   origin:  "http://localhost:3000" ,
+//   // origin: "https://medi-store-frontend-khaki.vercel.app" ,
+//   credentials: true,
+//   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+//   allowedHeaders: ["Content-Type", "Authorization"],
+//   optionsSuccessStatus: 200,
+// };
+
+
+// app.use(cors(corsOptions));
 app.use(cookieParser());
 app.use(express.json());
 
@@ -62,3 +97,4 @@ app.get("/health", (_req, res) => {
 });
 
 export default app;
+

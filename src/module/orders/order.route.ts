@@ -9,6 +9,7 @@ const router=Router();
 router.post("/",auth(),orderController.createOrder);
 router.get("/",auth(),orderController.getUsersOrder);
 router.get("/:id",auth(),orderController.getOrderDetails);
+router.delete("/:id",auth(),orderController.orderDeleteByCustomer);
 
 export const orderRouter=router;
 

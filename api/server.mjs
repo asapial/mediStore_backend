@@ -121,9 +121,8 @@ model OrderItem {
   quantity   Int
   status     OrderStatus @default(PLACED)
   price      Float
-
-  order    Order    @relation(fields: [orderId], references: [id])
-  medicine Medicine @relation(fields: [medicineId], references: [id])
+  order      Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  medicine   Medicine    @relation(fields: [medicineId], references: [id])
 }
 
 // Cart model for storing a user's active shopping cart
@@ -300,7 +299,7 @@ var init_auth = __esm({
     "use strict";
     init_prisma();
     auth = betterAuth({
-      trustedOrigins: ["https://medi-store-frontend-nine.vercel.app", "http://localhost:3000"],
+      trustedOrigins: ["https://medi-store-frontend-khaki.vercel.app", "http://localhost:3000"],
       database: prismaAdapter(prisma, {
         provider: "postgresql"
         // or "mysql", "postgresql", ...etc
@@ -318,12 +317,29 @@ var init_auth = __esm({
           }
         }
       },
-      advanced: {
-        defaultCookieAttributes: {
-          sameSite: "none",
-          secure: true,
-          httpOnly: true
+      // advanced:{
+      //     defaultCookieAttributes:{
+      //         sameSite:"none",
+      //         secure:false,
+      //         httpOnly:false
+      //     }
+      // }
+      session: {
+        cookieCache: {
+          enabled: true,
+          maxAge: 5 * 60
+          // 5 minutes
         }
+      },
+      advanced: {
+        cookiePrefix: "better-auth",
+        useSecureCookies: process.env.NODE_ENV === "production",
+        // useSecureCookies: false,
+        crossSubDomainCookies: {
+          enabled: false
+        },
+        disableCSRFCheck: true
+        // Allow requests without Origin header (Postman, mobile apps, etc.)
       }
     });
   }
@@ -858,7 +874,7 @@ var init_order_types = __esm({
 });
 
 // src/module/orders/order.service.ts
-var postOrderQuery, getUserOrdersQuery, getOrderDetailsQuery, orderService;
+var postOrderQuery, getUserOrdersQuery, getOrderDetailsQuery, deleteOrderByCustomer, orderService;
 var init_order_service = __esm({
   "src/module/orders/order.service.ts"() {
     "use strict";
@@ -942,16 +958,34 @@ var init_order_service = __esm({
       }
       return result;
     };
+    deleteOrderByCustomer = async (orderId) => {
+      const order = await prisma.order.findUnique({
+        where: {
+          id: orderId
+        }
+      });
+      if (!order) {
+        throw new Error("Order not found");
+      }
+      if (order.status === "DELIVERED" || order.status === "CANCELLED") {
+        throw new Error("Cannot delete delivered or cancelled orders");
+      }
+      await prisma.order.delete({
+        where: { id: orderId }
+      });
+      return { message: "Order deleted successfully" };
+    };
     orderService = {
       postOrderQuery,
       getUserOrdersQuery,
-      getOrderDetailsQuery
+      getOrderDetailsQuery,
+      deleteOrderByCustomer
     };
   }
 });
 
 // src/module/orders/order.controller.ts
-var createOrder, getUsersOrder, getOrderDetails, orderController;
+var createOrder, getUsersOrder, getOrderDetails, orderDeleteByCustomer, orderController;
 var init_order_controller = __esm({
   "src/module/orders/order.controller.ts"() {
     "use strict";
@@ -1000,10 +1034,23 @@ var init_order_controller = __esm({
         });
       }
     };
+    orderDeleteByCustomer = async (req, res, next) => {
+      const id = req.params.id;
+      if (!id || typeof id !== "string") {
+        return res.status(400).json({ message: "Order ID is required" });
+      }
+      try {
+        const result = await orderService.deleteOrderByCustomer(id);
+        return res.status(200).json({ success: true, data: result });
+      } catch (err) {
+        return res.status(400).json({ success: false, message: err instanceof Error ? err.message : "Error deleting order" });
+      }
+    };
     orderController = {
       createOrder,
       getUsersOrder,
-      getOrderDetails
+      getOrderDetails,
+      orderDeleteByCustomer
     };
   }
 });
@@ -1020,6 +1067,7 @@ var init_order_route = __esm({
     router2.post("/", auth_middleware_default(), orderController.createOrder);
     router2.get("/", auth_middleware_default(), orderController.getUsersOrder);
     router2.get("/:id", auth_middleware_default(), orderController.getOrderDetails);
+    router2.delete("/:id", auth_middleware_default(), orderController.orderDeleteByCustomer);
     orderRouter = router2;
   }
 });
@@ -1462,10 +1510,9 @@ var init_auth_controller = __esm({
           returnHeaders: true,
           body: { email, password }
         });
-        const setCookie = headers.get("set-cookie");
-        console.log("Data form login controller:", setCookie);
-        if (setCookie) {
-          res.setHeader("Set-Cookie", setCookie);
+        const cookies = headers.getSetCookie?.() ?? headers.get("set-cookie");
+        if (cookies) {
+          res.setHeader("Set-Cookie", cookies);
         }
         res.status(200).json({
           message: "Login successful",
@@ -1972,7 +2019,7 @@ import express from "express";
 import cors from "cors";
 import { toNodeHandler } from "better-auth/node";
 import cookieParser from "cookie-parser";
-var app, corsOptions, app_default;
+var app, allowedOrigins, app_default;
 var init_app = __esm({
   "src/app.ts"() {
     "use strict";
@@ -1984,16 +2031,27 @@ var init_app = __esm({
     init_medicine_router();
     init_cart_router();
     app = express();
-    corsOptions = {
-      // origin: allowedOrigins 
-      // origin:  "http://localhost:3000" ,
-      origin: "https://medi-store-frontend-nine.vercel.app",
-      credentials: true,
-      methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-      allowedHeaders: ["Content-Type", "Authorization"],
-      optionsSuccessStatus: 200
-    };
-    app.use(cors(corsOptions));
+    allowedOrigins = [
+      "http://localhost:3000"
+      //  "https://medi-store-frontend-khaki.vercel.app"
+    ].filter(Boolean);
+    app.use(
+      cors({
+        origin: (origin, callback) => {
+          if (!origin) return callback(null, true);
+          const isAllowed = allowedOrigins.includes(origin) || /^https:\/\/next-blog-client.*\.vercel\.app$/.test(origin) || /^https:\/\/.*\.vercel\.app$/.test(origin);
+          if (isAllowed) {
+            callback(null, true);
+          } else {
+            callback(new Error(`Origin ${origin} not allowed by CORS`));
+          }
+        },
+        credentials: true,
+        methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+        allowedHeaders: ["Content-Type", "Authorization", "Cookie"],
+        exposedHeaders: ["Set-Cookie"]
+      })
+    );
     app.use(cookieParser());
     app.use(express.json());
     app.use("/api/auth", authRouter);

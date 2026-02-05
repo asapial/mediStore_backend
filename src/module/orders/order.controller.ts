@@ -39,9 +39,9 @@ const getUsersOrder = async (
         const result = await orderService.getUserOrdersQuery(userId as string);
 
         res.status(200).json({
-            success:true,
-            message:"User orders fetched successfully",
-            data:result
+            success: true,
+            message: "User orders fetched successfully",
+            data: result
         })
 
     } catch (error) {
@@ -61,20 +61,42 @@ const getOrderDetails = async (
         const result = await orderService.getOrderDetailsQuery(orderId as string);
 
         res.status(200).json({
-            success:true,
-            message:"Order details fetched successfully",
-            data:result
+            success: true,
+            message: "Order details fetched successfully",
+            data: result
         })
 
     } catch (error) {
 
         res.status(500).json({
-            success:false,
-            message:"Failed to fetch order details",
-            error:error
+            success: false,
+            message: "Failed to fetch order details",
+            error: error
         })
 
         // next(error);
+    }
+}
+
+const orderDeleteByCustomer = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+) => {
+
+    const id  = req.params.id;
+
+    if (!id || typeof id !== "string") {
+        return res.status(400).json({ message: "Order ID is required" });
+    }
+
+    try {
+        const result = await orderService.deleteOrderByCustomer(id);
+        return res.status(200).json({ success: true, data: result });
+    } catch (err: unknown) {
+        return res
+            .status(400)
+            .json({ success: false, message: err instanceof Error ? err.message : "Error deleting order" });
     }
 }
 
@@ -84,5 +106,6 @@ const getOrderDetails = async (
 export const orderController = {
     createOrder,
     getUsersOrder,
-    getOrderDetails
+    getOrderDetails,
+    orderDeleteByCustomer
 }
