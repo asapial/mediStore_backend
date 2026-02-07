@@ -14,12 +14,12 @@ const app: Application = express();
 
 // ✅ CORS setup (must be FIRST)
 const allowedOrigins = [
-  "http://localhost:3000", 
-  //  "https://medi-store-frontend-khaki.vercel.app"
+  "http://localhost:3000",
+   "https://medi-store-frontend-khaki.vercel.app"
 ].filter(Boolean);
 
 const corsOptions = {
-  origin: allowedOrigins ,
+  origin: allowedOrigins,
   // origin:  "http://localhost:3000" ,
   // origin: "https://medi-store-frontend-khaki.vercel.app" ,
   credentials: true,

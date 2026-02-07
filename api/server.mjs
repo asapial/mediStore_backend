@@ -338,8 +338,13 @@ var init_auth = __esm({
         crossSubDomainCookies: {
           enabled: false
         },
-        disableCSRFCheck: true
+        disableCSRFCheck: true,
         // Allow requests without Origin header (Postman, mobile apps, etc.)
+        defaultCookieAttributes: {
+          sameSite: "none",
+          secure: true,
+          httpOnly: false
+        }
       }
     });
   }
@@ -2032,8 +2037,8 @@ var init_app = __esm({
     init_cart_router();
     app = express();
     allowedOrigins = [
-      "http://localhost:3000"
-      //  "https://medi-store-frontend-khaki.vercel.app"
+      "http://localhost:3000",
+      "https://medi-store-frontend-khaki.vercel.app"
     ].filter(Boolean);
     app.use(
       cors({

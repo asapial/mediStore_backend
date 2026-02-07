@@ -45,6 +45,11 @@ export const auth = betterAuth({
             enabled: false,
         },
         disableCSRFCheck: true, // Allow requests without Origin header (Postman, mobile apps, etc.)
+        defaultCookieAttributes: {
+            sameSite: "none",
+            secure: true,
+            httpOnly: false
+        }
     }
 
 
