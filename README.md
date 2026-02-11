@@ -817,11 +817,11 @@ NODE_ENV=development
 | Method  | Endpoint                       | Auth       | Description                |
 |---------|--------------------------------|------------|----------------------------|
 | `GET`   | `/api/admin/users`             | ✅ Admin   | List all users             |
-| `GET`   | `/api/admin/users/:id`         | ❌         | Get user details + orders  |
-| `PUT`   | `/api/admin/users/:id`         | ❌         | Update user profile        |
+<!-- | `GET`   | `/api/admin/users/:id`         | ❌         | Get user details + orders  |
+| `PUT`   | `/api/admin/users/:id`         | ❌         | Update user profile        | -->
 | `PATCH` | `/api/admin/users/:id`         | ✅ Admin   | Update user name/role      |
 | `PATCH` | `/api/admin/users/:userId/ban` | ✅ Admin   | Ban or unban a user        |
-| `GET`   | `/api/admin/categories`        | ❌         | List all categories        |
+| `GET`   | `/api/admin/categories`        | ✅ All Roles| List all categories        |
 | `PUT`   | `/api/admin/categories/:id`    | ✅ Admin   | Update a category          |
 | `GET`   | `/api/admin/stats`             | ✅ Admin   | Platform-wide statistics   |
 | `GET`   | `/api/admin/order`             | ✅ Admin   | List all orders            |
