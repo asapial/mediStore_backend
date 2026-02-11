@@ -8,7 +8,7 @@ const router= Router();
 
 
 router.get("/",medicineController.getAllMedicines );
-router.get("/own",auth(),medicineController.getMyMedicines );
+router.get("/own",auth(["SELLER"]),medicineController.getMyMedicines );
 router.get("/:id",medicineController.getMedicineById );
 
 export const medicineRouter=router;

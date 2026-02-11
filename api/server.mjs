@@ -2036,9 +2036,12 @@ var init_app = __esm({
     init_medicine_router();
     init_cart_router();
     app = express();
+    app.use(cookieParser());
+    app.use(express.json());
     allowedOrigins = [
       "http://localhost:3000",
-      "https://medi-store-frontend-khaki.vercel.app"
+      "https://medi-store-frontend-khaki.vercel.app",
+      "https://medistorefrontend.vercel.app"
     ].filter(Boolean);
     app.use(
       cors({
@@ -2057,8 +2060,6 @@ var init_app = __esm({
         exposedHeaders: ["Set-Cookie"]
       })
     );
-    app.use(cookieParser());
-    app.use(express.json());
     app.use("/api/auth", authRouter);
     app.use("/api/seller", sellerRouter);
     app.use("/api/orders", orderRouter);
