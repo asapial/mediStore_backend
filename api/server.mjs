@@ -1078,7 +1078,7 @@ var init_order_route = __esm({
 });
 
 // src/module/admin/admin.service.ts
-var getAllUsersQuery, getAllCategoryQuery, getUserDetailsQuery, updateUserQuery, updateCategoryQuery, getAdminStatsService, getAllOrder, banUserService, updateUserByAdmin, adminService;
+var getAllUsersQuery, getAllCategoryQuery, getUserDetailsQuery, updateUserQuery, updateCategoryQuery, getAdminStatsService, getAllOrder, banUserService, updateUserByAdmin, deleteCategoryQuery, createCategoryQuery, adminService;
 var init_admin_service = __esm({
   "src/module/admin/admin.service.ts"() {
     "use strict";
@@ -1255,6 +1255,16 @@ var init_admin_service = __esm({
         }
       });
     };
+    deleteCategoryQuery = async (id) => {
+      return prisma.category.delete({
+        where: { id }
+      });
+    };
+    createCategoryQuery = async (name) => {
+      return prisma.category.create({
+        data: { name }
+      });
+    };
     adminService = {
       getAllUsersQuery,
       getAllCategoryQuery,
@@ -1264,13 +1274,15 @@ var init_admin_service = __esm({
       getAdminStatsService,
       getAllOrder,
       banUserService,
-      updateUserByAdmin
+      updateUserByAdmin,
+      createCategoryQuery,
+      deleteCategoryQuery
     };
   }
 });
 
 // src/module/admin/admin.controller.ts
-var getAllUsers, getUserDetails, getAllCategory, updateUser, updateCategory, getAdminStatsController, getAllOrder2, banUserController, adminUpdateUser, adminController;
+var getAllUsers, getUserDetails, getAllCategory, createCategory, deleteCategory, updateUser, updateCategory, getAdminStatsController, getAllOrder2, banUserController, adminUpdateUser, adminController;
 var init_admin_controller = __esm({
   "src/module/admin/admin.controller.ts"() {
     "use strict";
@@ -1330,6 +1342,45 @@ var init_admin_controller = __esm({
         });
       } catch (error) {
         return res.status(500).json({
+          status: false,
+          message: "Internal server error",
+          error
+        });
+      }
+    };
+    createCategory = async (req, res) => {
+      try {
+        const { name } = req.body;
+        if (!name || !name.trim()) {
+          return res.status(400).json({
+            status: false,
+            message: "Category name is required"
+          });
+        }
+        const result = await adminService.createCategoryQuery(name);
+        res.status(201).json({
+          status: true,
+          message: "Category created successfully",
+          data: result
+        });
+      } catch (error) {
+        res.status(500).json({
+          status: false,
+          message: "Internal server error",
+          error
+        });
+      }
+    };
+    deleteCategory = async (req, res) => {
+      try {
+        const { id } = req.params;
+        await adminService.deleteCategoryQuery(id);
+        res.status(200).json({
+          status: true,
+          message: "Category deleted successfully"
+        });
+      } catch (error) {
+        res.status(500).json({
           status: false,
           message: "Internal server error",
           error
@@ -1449,7 +1500,9 @@ var init_admin_controller = __esm({
       getAdminStatsController,
       getAllOrder: getAllOrder2,
       banUserController,
-      adminUpdateUser
+      adminUpdateUser,
+      createCategory,
+      deleteCategory
     };
   }
 });
@@ -1463,19 +1516,21 @@ var init_admin_route = __esm({
     init_admin_controller();
     init_auth_middleware();
     router3 = Router3();
-    router3.get("/users", adminController.getAllUsers);
+    router3.get("/users", auth_middleware_default(["ADMIN"]), adminController.getAllUsers);
     router3.get("/users/:id", adminController.getUserDetails);
     router3.get("/categories", adminController.getAllCategory);
-    router3.put("/categories/:id", adminController.updateCategory);
+    router3.post("/categories", auth_middleware_default(["ADMIN"]), adminController.createCategory);
+    router3.delete("/categories/:id", auth_middleware_default(["ADMIN"]), adminController.deleteCategory);
+    router3.put("/categories/:id", auth_middleware_default(["ADMIN"]), adminController.updateCategory);
     router3.put("/users/:id", adminController.updateUser);
-    router3.get("/stats", auth_middleware_default(), adminController.getAdminStatsController);
-    router3.get("/order", adminController.getAllOrder);
+    router3.get("/stats", auth_middleware_default(["ADMIN"]), adminController.getAdminStatsController);
+    router3.get("/order", auth_middleware_default(["ADMIN"]), adminController.getAllOrder);
     router3.patch(
       "/users/:userId/ban",
-      auth_middleware_default(),
+      auth_middleware_default(["ADMIN"]),
       adminController.banUserController
     );
-    router3.patch("/users/:id", auth_middleware_default(), adminController.adminUpdateUser);
+    router3.patch("/users/:id", auth_middleware_default(["ADMIN"]), adminController.adminUpdateUser);
     adminRouter = router3;
   }
 });

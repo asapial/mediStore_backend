@@ -8,6 +8,8 @@ const router = Router();
 router.get("/users",auth([ "ADMIN"]),adminController.getAllUsers);
 router.get("/users/:id",adminController.getUserDetails);
 router.get("/categories",adminController.getAllCategory);
+router.post("/categories",auth([ "ADMIN"]), adminController.createCategory);
+router.delete("/categories/:id",auth([ "ADMIN"]), adminController.deleteCategory);
 router.put("/categories/:id",auth([ "ADMIN"]), adminController.updateCategory);
 router.put("/users/:id",adminController.updateUser);
 router.get("/stats", auth([ "ADMIN"]), adminController.getAdminStatsController);
