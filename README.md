@@ -50,7 +50,7 @@
 | **Seller**   | List/manage own medicines, view & update order statuses, access sales stats   |
 | **Admin**    | Manage all users (ban/unban, role changes), view categories, platform stats   |
 
-**Live API:** `https://medistorebackend-mu.vercel.app`
+**Live API:** `https://medistorebackend-jet.vercel.app`
 
 ---
 
@@ -201,7 +201,7 @@ NODE_ENV=development
 
 ## 📡 API Reference
 
-**Base URL:** `http://localhost:5000` (development) | `https://medistorebackend-mu.vercel.app` (production)
+**Base URL:** `http://localhost:5000` (development) | `https://medistorebackend-jet.vercel.app` (production)
 
 > All protected endpoints require a valid session cookie set via the login endpoint. The authentication middleware validates sessions through Better Auth and enforces role-based access control.
 
