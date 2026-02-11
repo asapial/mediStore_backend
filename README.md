@@ -29,7 +29,7 @@
   - [Health & Root](#health--root)
   - [Authentication](#authentication)
   - [Medicines (Public)](#medicines-public)
-  - [Cart (Customer)](#cart-customer)
+  - [Cart](#cart)
   - [Orders (Customer)](#orders-customer)
   - [Seller Dashboard](#seller-dashboard)
   - [Admin Panel](#admin-panel)
@@ -48,7 +48,7 @@
 |--------------|------------------------------------------------------------------------------|
 | **Customer** | Browse medicines, manage cart, place & track orders, update profile           |
 | **Seller**   | List/manage own medicines, view & update order statuses, access sales stats   |
-| **Admin**    | Manage all users (ban/unban, role changes), view categories, platform stats   |
+| **Admin**    | Manage all users (ban/unban, role changes), manage categories, view platform-wide stats, view all orders |
 
 **Live API:** `https://medistorebackend-jet.vercel.app`
 
@@ -181,7 +181,7 @@ Create a `.env` file in the project root with the following variables:
 | Variable             | Description                                          | Example                                  |
 |----------------------|------------------------------------------------------|------------------------------------------|
 | `DATABASE_URL`       | PostgreSQL connection string                         | `postgresql://user:pass@host:5432/db?sslmode=require` |
-| `BETTER_AUTH_SECRET` | Secret key for Better Auth session signing           | `JfABcSTOsF6TrPqaq1EHKTOPBAqEpSc3`      |
+| `BETTER_AUTH_SECRET` | Secret key for Better Auth session signing           | `your_secret_key_here`      |
 | `BETTER_AUTH_URL`    | Base URL of the backend application                  | `http://localhost:5000`                   |
 | `ORIGIN_URL`         | Frontend application URL (for CORS)                  | `http://localhost:3000`                   |
 | `BACKEND_URL`        | Backend URL (used internally)                        | `http://localhost:5000`                   |
@@ -204,6 +204,16 @@ NODE_ENV=development
 **Base URL:** `http://localhost:5000` (development) | `https://medistorebackend-jet.vercel.app` (production)
 
 > All protected endpoints require a valid session cookie set via the login endpoint. The authentication middleware validates sessions through Better Auth and enforces role-based access control.
+
+**Auth Legend:**
+
+| Symbol              | Meaning                                                 |
+|---------------------|---------------------------------------------------------|
+| ❌                  | No authentication required (public)                     |
+| ✅ All Roles        | Any authenticated user (Customer, Seller, or Admin)     |
+| ✅ Customer         | Only authenticated users with `CUSTOMER` role           |
+| ✅ Seller           | Only authenticated users with `SELLER` role             |
+| ✅ Admin            | Only authenticated users with `ADMIN` role              |
 
 ---
 
@@ -338,12 +348,25 @@ NODE_ENV=development
 }
 ```
 
+**Validation:**
+- `name` and `email` are required
+- `image` is optional (set to `null` if not provided)
+- Email uniqueness is checked against other users
+
 **Response** `200 OK`
 ```json
 {
   "success": true,
   "message": "Profile updated successfully",
-  "user": { ... }
+  "user": {
+    "id": "clx...",
+    "name": "John Updated",
+    "email": "john.new@example.com",
+    "image": "https://example.com/avatar.jpg",
+    "role": "CUSTOMER",
+    "createdAt": "...",
+    "updatedAt": "..."
+  }
 }
 ```
 </details>
@@ -394,6 +417,33 @@ NODE_ENV=development
   ]
 }
 ```
+> Results are sorted by `createdAt` in descending order (newest first).
+</details>
+
+<details>
+<summary><strong>GET /api/medicines/own</strong> — Get Seller's Own Medicines</summary>
+
+**Headers:** Requires valid session cookie (Seller role)
+
+**Response** `200 OK`
+```json
+{
+  "success": true,
+  "count": 5,
+  "data": [
+    {
+      "id": "clx...",
+      "name": "Paracetamol 500mg",
+      "description": "Pain reliever",
+      "price": 5.99,
+      "stock": 100,
+      "manufacturer": "PharmaCorp",
+      "category": { "name": "Pain Relief" },
+      "seller": { "name": "MedSupply" }
+    }
+  ]
+}
+```
 </details>
 
 <details>
@@ -419,17 +469,17 @@ NODE_ENV=development
 
 ---
 
-### Cart (Customer)
+### Cart
 
 **Prefix:** `/api/cart`
 
-| Method   | Endpoint                           | Auth         | Description                    |
-|----------|------------------------------------|--------------|--------------------------------|
-| `GET`    | `/api/cart`                        | ✅ Customer  | Get user's cart                |
-| `POST`   | `/api/cart/add`                    | ✅ All Roles | Add item to cart               |
-| `GET`    | `/api/cart/status/:medicineId`     | ✅ All Roles | Check if medicine is in cart   |
-| `PATCH`  | `/api/cart/update`                 | ✅ Customer  | Update cart item quantity      |
-| `DELETE` | `/api/cart/remove`                 | ✅ Customer  | Remove item from cart          |
+| Method   | Endpoint                           | Auth           | Description                    |
+|----------|------------------------------------|----------------|--------------------------------|
+| `GET`    | `/api/cart`                        | ✅ Customer    | Get user's cart                |
+| `POST`   | `/api/cart/add`                    | ✅ All Roles   | Add item to cart               |
+| `GET`    | `/api/cart/status/:medicineId`     | ✅ All Roles   | Check if medicine is in cart   |
+| `PATCH`  | `/api/cart/update`                 | ✅ Customer    | Update cart item quantity      |
+| `DELETE` | `/api/cart/remove`                 | ✅ Customer    | Remove item from cart          |
 
 <details>
 <summary><strong>POST /api/cart/add</strong> — Add to Cart</summary>
@@ -441,6 +491,10 @@ NODE_ENV=development
   "quantity": 2
 }
 ```
+
+**Validation:**
+- `medicineId` is required
+- `quantity` defaults to `1` if not provided
 
 **Response** `200 OK`
 ```json
@@ -455,7 +509,7 @@ NODE_ENV=development
   }
 }
 ```
-> If the item already exists in the cart, the quantity is **incremented**.
+> If the item already exists in the cart, the quantity is **incremented**. A cart is auto-created for the user if one doesn't exist.
 </details>
 
 <details>
@@ -479,6 +533,23 @@ NODE_ENV=development
   }
 }
 ```
+> Returns empty cart (`items: [], totalQuantity: 0, totalPrice: 0`) if no cart exists.
+</details>
+
+<details>
+<summary><strong>GET /api/cart/status/:medicineId</strong> — Check Medicine Cart Status</summary>
+
+**Response** `200 OK`
+```json
+{
+  "success": true,
+  "data": {
+    "inCart": true,
+    "quantity": 3
+  }
+}
+```
+> Returns `{ "inCart": false, "quantity": 0 }` if the medicine is not in the user's cart.
 </details>
 
 <details>
@@ -536,6 +607,7 @@ NODE_ENV=development
 **Validation Rules:**
 - `address` — minimum 5 characters
 - `items` — at least 1 item required
+- `medicineId` — required, non-empty string
 - `quantity` — positive integer
 
 **Response** `201 Created`
@@ -551,7 +623,42 @@ NODE_ENV=development
   }
 }
 ```
-> Order creation is wrapped in a **Prisma transaction** to ensure atomicity. Medicine prices are snapshotted at order time.
+> Order creation is wrapped in a **Prisma transaction** to ensure atomicity. Medicine prices are snapshotted at order time. All requested medicine IDs are validated to exist before the order is created.
+</details>
+
+<details>
+<summary><strong>GET /api/orders</strong> — Get User's Orders</summary>
+
+**Response** `200 OK`
+```json
+{
+  "success": true,
+  "message": "User orders fetched successfully",
+  "data": [
+    {
+      "id": "clx...",
+      "status": "PLACED",
+      "address": "...",
+      "createdAt": "...",
+      "items": [
+        {
+          "id": "...",
+          "quantity": 2,
+          "status": "PLACED",
+          "price": 5.99,
+          "medicine": {
+            "name": "Paracetamol",
+            "description": "...",
+            "price": 5.99,
+            "image": "...",
+            "sellerId": "..."
+          }
+        }
+      ]
+    }
+  ]
+}
+```
 </details>
 
 <details>
@@ -574,14 +681,14 @@ NODE_ENV=development
 
 **Prefix:** `/api/seller`
 
-| Method   | Endpoint                     | Auth       | Description                    |
-|----------|------------------------------|------------|--------------------------------|
-| `POST`   | `/api/seller/medicines`      | ✅ Seller  | Add a new medicine             |
-| `PUT`    | `/api/seller/medicines/:id`  | ✅ Seller  | Update a medicine              |
-| `DELETE` | `/api/seller/medicines/:id`  | ✅ Seller  | Delete a medicine              |
-| `GET`    | `/api/seller/orders`         | ✅ Seller  | Get orders containing seller's products |
-| `PUT`    | `/api/seller/orders`         | ✅ Seller  | Update order item statuses     |
-| `GET`    | `/api/seller/stat`           | ✅ Auth    | Get seller dashboard statistics|
+| Method   | Endpoint                     | Auth         | Description                    |
+|----------|------------------------------|--------------|--------------------------------|
+| `POST`   | `/api/seller/medicines`      | ✅ Seller    | Add a new medicine             |
+| `PUT`    | `/api/seller/medicines/:id`  | ✅ Seller    | Update a medicine              |
+| `DELETE` | `/api/seller/medicines/:id`  | ✅ Seller    | Delete a medicine              |
+| `GET`    | `/api/seller/orders`         | ✅ Seller    | Get orders containing seller's products |
+| `PUT`    | `/api/seller/orders`         | ✅ Seller    | Update order item statuses     |
+| `GET`    | `/api/seller/stat`           | ✅ All Roles | Get seller dashboard statistics|
 
 <details>
 <summary><strong>POST /api/seller/medicines</strong> — Add Medicine</summary>
@@ -609,6 +716,55 @@ NODE_ENV=development
 | `stock`        | non-negative integer                |
 | `manufacturer` | min 2 characters                    |
 | `categoryId`   | required string                     |
+
+> The `sellerId` is automatically set from the authenticated user's session.
+</details>
+
+<details>
+<summary><strong>PUT /api/seller/medicines/:id</strong> — Update Medicine</summary>
+
+**Request Body (all fields optional):**
+```json
+{
+  "name": "Updated Name",
+  "description": "Updated description",
+  "price": 7.99,
+  "stock": 50
+}
+```
+> Only the fields provided in the request body will be updated. Uses partial update logic.
+</details>
+
+<details>
+<summary><strong>GET /api/seller/orders</strong> — Get Seller's Orders</summary>
+
+**Response** `200 OK`
+```json
+{
+  "status": true,
+  "message": "Data fetched successfully",
+  "data": [
+    {
+      "id": "clx...",
+      "status": "PLACED",
+      "address": "...",
+      "createdAt": "...",
+      "items": [
+        {
+          "id": "...",
+          "orderId": "...",
+          "medicineId": "...",
+          "quantity": 2,
+          "price": 5.99,
+          "status": "PLACED",
+          "medicine": { "sellerId": "...", "name": "..." }
+        }
+      ]
+    }
+  ]
+}
+```
+> Returns only orders (and their items) that contain medicines belonging to the authenticated seller.
 </details>
 
 <details>
@@ -622,7 +778,7 @@ NODE_ENV=development
   "status": "SHIPPED"
 }
 ```
-> When **all items** in an order reach the same status, the parent order status is automatically updated.
+> When **all items** in an order reach the same status, the parent order status is automatically updated to match.
 </details>
 
 <details>
@@ -649,6 +805,7 @@ NODE_ENV=development
   }
 }
 ```
+> Low stock threshold is set at 10 units. Revenue calculations only include items sold by the authenticated seller.
 </details>
 
 ---
@@ -659,15 +816,88 @@ NODE_ENV=development
 
 | Method  | Endpoint                       | Auth       | Description                |
 |---------|--------------------------------|------------|----------------------------|
-| `GET`   | `/api/admin/users`             | —          | List all users             |
-| `GET`   | `/api/admin/users/:id`         | —          | Get user details + orders  |
-| `PUT`   | `/api/admin/users/:id`         | —          | Update user profile        |
-| `PATCH` | `/api/admin/users/:id`         | ✅ Auth    | Update user name/role      |
+| `GET`   | `/api/admin/users`             | ✅ Admin   | List all users             |
+| `GET`   | `/api/admin/users/:id`         | ❌         | Get user details + orders  |
+| `PUT`   | `/api/admin/users/:id`         | ❌         | Update user profile        |
+| `PATCH` | `/api/admin/users/:id`         | ✅ Admin   | Update user name/role      |
 | `PATCH` | `/api/admin/users/:userId/ban` | ✅ Admin   | Ban or unban a user        |
-| `GET`   | `/api/admin/categories`        | —          | List all categories        |
-| `PUT`   | `/api/admin/categories/:id`    | —          | Update a category          |
-| `GET`   | `/api/admin/stats`             | ✅ Auth    | Platform-wide statistics   |
-| `GET`   | `/api/admin/order`             | —          | List all orders            |
+| `GET`   | `/api/admin/categories`        | ❌         | List all categories        |
+| `PUT`   | `/api/admin/categories/:id`    | ✅ Admin   | Update a category          |
+| `GET`   | `/api/admin/stats`             | ✅ Admin   | Platform-wide statistics   |
+| `GET`   | `/api/admin/order`             | ✅ Admin   | List all orders            |
+
+<details>
+<summary><strong>GET /api/admin/users</strong> — List All Users</summary>
+
+**Response** `200 OK`
+```json
+{
+  "status": true,
+  "message": "Users fetched successfully",
+  "data": [
+    {
+      "id": "clx...",
+      "name": "John Doe",
+      "email": "john@example.com",
+      "role": "CUSTOMER",
+      "isBanned": false,
+      "createdAt": "..."
+    }
+  ]
+}
+```
+</details>
+
+<details>
+<summary><strong>GET /api/admin/users/:id</strong> — Get User Details</summary>
+
+**Response** `200 OK`
+```json
+{
+  "status": true,
+  "message": "User fetched successfully",
+  "data": {
+    "id": "clx...",
+    "name": "John Doe",
+    "email": "john@example.com",
+    "role": "CUSTOMER",
+    "isBanned": false,
+    "orders": [...]
+  }
+}
+```
+> Includes the user's order history.
+</details>
+
+<details>
+<summary><strong>PATCH /api/admin/users/:id</strong> — Update User Name/Role (Admin)</summary>
+
+**Request Body:**
+```json
+{
+  "name": "Updated Name",
+  "role": "SELLER"
+}
+```
+
+> At least one of `name` or `role` must be provided. Valid roles are `CUSTOMER`, `SELLER`, or `ADMIN`.
+
+**Response** `200 OK`
+```json
+{
+  "status": true,
+  "message": "User updated successfully",
+  "data": {
+    "id": "...",
+    "name": "Updated Name",
+    "email": "...",
+    "role": "SELLER",
+    "isBanned": false,
+    "updatedAt": "..."
+  }
+}
+```
+</details>
 
 <details>
 <summary><strong>PATCH /api/admin/users/:userId/ban</strong> — Ban/Unban User</summary>
@@ -734,6 +964,43 @@ NODE_ENV=development
 ```
 </details>
 
+<details>
+<summary><strong>GET /api/admin/order</strong> — List All Orders</summary>
+
+**Response** `200 OK`
+```json
+{
+  "success": true,
+  "message": "Order fetched successfully",
+  "data": [
+    {
+      "id": "clx...",
+      "userId": "...",
+      "status": "PLACED",
+      "address": "...",
+      "createdAt": "...",
+      "items": [
+        {
+          "id": "...",
+          "medicineId": "...",
+          "quantity": 2,
+          "status": "PLACED",
+          "price": 5.99,
+          "medicine": {
+            "id": "...",
+            "name": "Paracetamol",
+            "image": "...",
+            "manufacturer": "...",
+            "seller": { "id": "...", "name": "...", "image": "..." }
+          }
+        }
+      ]
+    }
+  ]
+}
+```
+</details>
+
 ---
 
 ## 📂 Project Structure
@@ -741,7 +1008,7 @@ NODE_ENV=development
 ```
 mediStore_backend/
 ├── prisma/
-│   ├── schema.prisma          # Database schema (10 models)
+│   ├── schema.prisma          # Database schema (10 models, 2 enums)
 │   └── migrations/            # Migration history
 ├── src/
 │   ├── app.ts                 # Express app setup, CORS, routes
@@ -791,7 +1058,11 @@ The project is configured for **Vercel** serverless deployment:
    }
    ```
 3. **Environment variables** — Set all `.env` variables in the Vercel dashboard
-4. **CORS** — Pre-configured to allow Vercel preview deployments (`*.vercel.app`)
+4. **CORS** — Pre-configured to allow the following origins:
+   - `http://localhost:3000` (local development)
+   - `https://medi-store-frontend-khaki.vercel.app`
+   - `https://medistorefrontend.vercel.app`
+   - Any `*.vercel.app` deployment (via regex pattern)
 
 ---
 
@@ -799,16 +1070,25 @@ The project is configured for **Vercel** serverless deployment:
 
 The API uses a **centralized global error handler** that maps Prisma error codes to appropriate HTTP status codes:
 
-| Error Type                    | HTTP Code | Description                          |
-|-------------------------------|-----------|--------------------------------------|
-| `PrismaClientValidationError` | `400`     | Invalid request data                 |
-| `P2001` / `P2025`            | `404`     | Record not found                     |
-| `P2002`                      | `409`     | Duplicate value (unique constraint)  |
-| `P2003`                      | `400`     | Foreign key constraint violation     |
-| `P1001` / `P1002`            | `503`     | Database unreachable                 |
-| `P2024` / `P2037`            | `503`     | Connection pool exhausted            |
-| `P2034`                      | `409`     | Transaction conflict                 |
-| Generic `Error`              | `500`     | Internal server error                |
+| Error Type / Code                     | HTTP Code | Description                              |
+|---------------------------------------|-----------|------------------------------------------|
+| `PrismaClientValidationError`         | `400`     | Invalid request data                     |
+| `P1000`                               | `401`     | Database authentication failed           |
+| `P1001` / `P1002` / `P1017`          | `503`     | Database server unreachable              |
+| `P1003` / `P1014`                    | `404`     | Database or table not found              |
+| `P1013`                               | `400`     | Invalid database connection string       |
+| `P2000` / `P2005` / `P2006` / `P2019` / `P2020` | `400` | Invalid data provided            |
+| `P2001` / `P2025`                    | `404`     | Record not found                         |
+| `P2002`                              | `409`     | Duplicate value (unique constraint)      |
+| `P2003`                              | `400`     | Foreign key constraint violation         |
+| `P2011` / `P2012` / `P2013`         | `400`     | Missing required field                   |
+| `P2021` / `P2022`                    | `404`     | Database table or column not found       |
+| `P2024` / `P2037`                    | `503`     | Connection pool exhausted                |
+| `P2034`                              | `409`     | Transaction conflict                     |
+| `PrismaClientUnknownRequestError`     | `500`     | Unknown database error                   |
+| `PrismaClientInitializationError`     | `500`     | Failed to initialize database connection |
+| `PrismaClientRustPanicError`          | `500`     | Database engine crashed                  |
+| Generic `Error`                       | `500`     | Internal server error                    |
 
 **Standard error response format:**
 ```json
@@ -827,5 +1107,5 @@ This project is licensed under the **ISC License**.
 ---
 
 <p align="center">
-  Made with ❤️ by <strong>Abu Syeed Abdullah</strong>
+  Made with ❤️ by <strong>Md Abu Syeed Abdullah</strong>
 </p>

@@ -5,19 +5,19 @@ import auth from "../../middleware/auth.middleware";
 const router = Router();
 
 
-router.get("/users",adminController.getAllUsers);
+router.get("/users",auth([ "ADMIN"]),adminController.getAllUsers);
 router.get("/users/:id",adminController.getUserDetails);
 router.get("/categories",adminController.getAllCategory);
-router.put("/categories/:id",adminController.updateCategory);
+router.put("/categories/:id",auth([ "ADMIN"]), adminController.updateCategory);
 router.put("/users/:id",adminController.updateUser);
-router.get("/stats", auth(), adminController.getAdminStatsController);
-router.get("/order",adminController.getAllOrder);
+router.get("/stats", auth([ "ADMIN"]), adminController.getAdminStatsController);
+router.get("/order",auth([ "ADMIN"]),adminController.getAllOrder);
 router.patch(
   "/users/:userId/ban",
-  auth(),
+  auth([ "ADMIN"]),
   adminController.banUserController
 );
 
-router.patch("/users/:id", auth(), adminController.adminUpdateUser);
+router.patch("/users/:id", auth([ "ADMIN"]), adminController.adminUpdateUser);
 
 export const adminRouter=router;
