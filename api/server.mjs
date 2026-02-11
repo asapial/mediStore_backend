@@ -850,12 +850,12 @@ var init_seller_route = __esm({
     init_seller_controller();
     init_auth_middleware();
     router = Router();
-    router.post("/medicines", auth_middleware_default(), sellerController.postMedicine);
-    router.put("/medicines/:id", sellerController.updateMedicine);
-    router.delete("/medicines/:id", sellerController.deleteMedicine);
-    router.get("/orders", auth_middleware_default(), sellerController.getSellerOrder);
+    router.post("/medicines", auth_middleware_default(["SELLER"]), sellerController.postMedicine);
+    router.put("/medicines/:id", auth_middleware_default(["SELLER"]), sellerController.updateMedicine);
+    router.delete("/medicines/:id", auth_middleware_default(["SELLER"]), sellerController.deleteMedicine);
+    router.get("/orders", auth_middleware_default(["SELLER"]), sellerController.getSellerOrder);
     router.get("/stat", auth_middleware_default(), sellerController.sellerStatController);
-    router.put("/orders", sellerController.updateOrderItemStatus);
+    router.put("/orders", auth_middleware_default(["SELLER"]), sellerController.updateOrderItemStatus);
     sellerRouter = router;
   }
 });
@@ -1069,10 +1069,10 @@ var init_order_route = __esm({
     init_order_controller();
     init_auth_middleware();
     router2 = Router2();
-    router2.post("/", auth_middleware_default(), orderController.createOrder);
-    router2.get("/", auth_middleware_default(), orderController.getUsersOrder);
-    router2.get("/:id", auth_middleware_default(), orderController.getOrderDetails);
-    router2.delete("/:id", auth_middleware_default(), orderController.orderDeleteByCustomer);
+    router2.post("/", auth_middleware_default(["CUSTOMER"]), orderController.createOrder);
+    router2.get("/", auth_middleware_default(["CUSTOMER"]), orderController.getUsersOrder);
+    router2.get("/:id", auth_middleware_default(["CUSTOMER"]), orderController.getOrderDetails);
+    router2.delete("/:id", auth_middleware_default(["CUSTOMER"]), orderController.orderDeleteByCustomer);
     orderRouter = router2;
   }
 });
@@ -1615,7 +1615,7 @@ var init_auth_route = __esm({
     router4.post("/register", authController.registerController);
     router4.post("/login", authController.loginController);
     router4.get("/me", auth_middleware_default(["CUSTOMER", "SELLER", "ADMIN"]), authController.meController);
-    router4.patch("/update", auth_middleware_default(), authController.updateProfileController);
+    router4.patch("/update", auth_middleware_default(["CUSTOMER", "SELLER", "ADMIN"]), authController.updateProfileController);
     authRouter = router4;
   }
 });
@@ -1776,7 +1776,7 @@ var init_medicine_router = __esm({
     init_auth_middleware();
     router5 = Router5();
     router5.get("/", medicineController.getAllMedicines);
-    router5.get("/own", auth_middleware_default(), medicineController.getMyMedicines);
+    router5.get("/own", auth_middleware_default(["SELLER"]), medicineController.getMyMedicines);
     router5.get("/:id", medicineController.getMedicineById);
     medicineRouter = router5;
   }
@@ -2010,11 +2010,11 @@ var init_cart_router = __esm({
     init_auth_middleware();
     init_cart_controller();
     router6 = Router6();
-    router6.get("/", auth_middleware_default(), cartController.getFromCartController);
+    router6.get("/", auth_middleware_default(["CUSTOMER"]), cartController.getFromCartController);
     router6.post("/add", auth_middleware_default(), cartController.addToCartController);
     router6.get("/status/:medicineId", auth_middleware_default(), cartController.getMedicineCartStatusController);
-    router6.patch("/update", auth_middleware_default(), cartController.updateCartItemController);
-    router6.delete("/remove", auth_middleware_default(), cartController.removeCartItemController);
+    router6.patch("/update", auth_middleware_default(["CUSTOMER"]), cartController.updateCartItemController);
+    router6.delete("/remove", auth_middleware_default(["CUSTOMER"]), cartController.removeCartItemController);
     cartRouter = router6;
   }
 });
