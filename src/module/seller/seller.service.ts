@@ -292,27 +292,34 @@ const getSellerStats = async (sellerId: string) => {
 const updateOrderItemStatusQuery = async (
     orderId: string,
     orderItemsList: string[],
-    // status: OrderStatus // <- strongly typed
-    status: string // <- strongly typed
+    status: string
 ) => {
+    // Update item statuses
     await prisma.orderItem.updateMany({
-        where: {
-            id: { in: orderItemsList },
-            orderId,
-        },
-        data: {
-            status:status, // ✅ pass the enum, not string
-        },
+        where: { id: { in: orderItemsList }, orderId },
+        data: { status },
     });
 
+    // If moving to SHIPPED → decrement medicine stock
+    if (status === "SHIPPED") {
+        const items = await prisma.orderItem.findMany({
+            where: { id: { in: orderItemsList } },
+            select: { medicineId: true, quantity: true },
+        });
+        await Promise.all(
+            items.map(item =>
+                prisma.medicine.update({
+                    where: { id: item.medicineId },
+                    data: { stock: { decrement: item.quantity } },
+                })
+            )
+        );
+    }
+
+    // If all items share the same status → promote the parent order too
     const remaining = await prisma.orderItem.count({
-        where: {
-            orderId,
-            status: { not: status },
-        },
+        where: { orderId, status: { not: status } },
     });
-
-
     if (remaining === 0) {
         await prisma.order.update({
             where: { id: orderId },
