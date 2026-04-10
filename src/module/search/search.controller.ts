@@ -19,15 +19,9 @@ const advancedSearch = catchAsync(async (req: Request, res: Response) => {
 
 // ─── Generic alternatives ─────────────────────────────────────────────────────
 const getGenericAlternatives = catchAsync(async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = String(req.params.id);
   const data = await searchService.getGenericAlternatives(id);
-
-  sendResponse(res, {
-    status: status.OK,
-    success: true,
-    message: "Generic alternatives fetched",
-    data,
-  });
+  sendResponse(res, { status: status.OK, success: true, message: "Generic alternatives fetched", data });
 });
 
 export const searchController = {

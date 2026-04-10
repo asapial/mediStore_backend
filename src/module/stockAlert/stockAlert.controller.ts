@@ -54,15 +54,9 @@ const getTriggeredAlerts = catchAsync(async (_req: Request, res: Response) => {
 
 // ─── SELLER: delete a stock alert ────────────────────────────────────────────
 const deleteStockAlert = catchAsync(async (req: Request, res: Response) => {
-  const { medicineId } = req.params;
+  const medicineId = String(req.params.medicineId);
   const data = await stockAlertService.deleteStockAlert(medicineId);
-
-  sendResponse(res, {
-    status: status.OK,
-    success: true,
-    message: "Stock alert deleted",
-    data,
-  });
+  sendResponse(res, { status: status.OK, success: true, message: "Stock alert deleted", data });
 });
 
 export const stockAlertController = {

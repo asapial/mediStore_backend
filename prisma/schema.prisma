@@ -52,6 +52,41 @@ enum SubscriptionFrequency {
   MONTHLY
 }
 
+enum CouponType {
+  PERCENTAGE
+  FIXED
+}
+
+enum LicenseStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum NotificationType {
+  ORDER_UPDATE
+  LOW_STOCK
+  SUBSCRIPTION_REFILL
+  SYSTEM
+  RETURN_UPDATE
+}
+
+enum ReturnStatus {
+  REQUESTED
+  APPROVED
+  REJECTED
+  COMPLETED
+}
+
+enum TrackingStatus {
+  PLACED
+  CONFIRMED
+  SHIPPED
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+}
+
 model User {
   id        String   @id @default(cuid())
   name      String
@@ -69,12 +104,18 @@ model User {
   updatedAt     DateTime   @updatedAt
   sessions      Session[]
   accounts      Account[]
-  // @@map("user")
   cart                 Cart?
   wallet               Wallet?
   prescriptions        Prescription[]
   subscriptions        Subscription[]
   sellerSubscriptions  Subscription[]      @relation("SellerSubscriptions")
+  notifications        Notification[]
+  returnRequests       ReturnRequest[]
+  wishlist             Wishlist?
+  sellerLicense        SellerLicense?
+  sellerCoupons        Coupon[]            @relation("SellerCoupons")
+  couponUsages         CouponUsage[]
+  sellerSubOrders      SubOrder[]          @relation("SellerSubOrders")
 
   @@map("user")
 }
@@ -106,6 +147,7 @@ model Medicine {
   batches       MedicineBatch[]
   stockAlert    StockAlert?
   subscriptions Subscription[]
+  wishlistItems WishlistItem[]
 }
 
 model MedicineBatch {
@@ -142,19 +184,24 @@ model Order {
   address   String
   createdAt DateTime    @default(now())
 
-  user  User        @relation(fields: [userId], references: [id])
-  items OrderItem[]
+  user          User            @relation(fields: [userId], references: [id])
+  items         OrderItem[]
+  subOrders     SubOrder[]
+  tracking      OrderTracking[]
+  returnRequest ReturnRequest?
 }
 
 model OrderItem {
-  id         String      @id @default(cuid())
-  orderId    String
-  medicineId String
-  quantity   Int
-  status     OrderStatus @default(PLACED)
-  price      Float
-  order      Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  medicine   Medicine    @relation(fields: [medicineId], references: [id])
+  id           String      @id @default(cuid())
+  orderId      String
+  medicineId   String
+  quantity     Int
+  status       OrderStatus @default(PLACED)
+  price        Float
+  subOrderId   String?
+  order        Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  medicine     Medicine    @relation(fields: [medicineId], references: [id])
+  subOrder     SubOrder?   @relation(fields: [subOrderId], references: [id])
 }
 
 model Prescription {
@@ -256,6 +303,144 @@ model Review {
 
   user     User     @relation(fields: [userId], references: [id])
   medicine Medicine @relation(fields: [medicineId], references: [id])
+}
+
+// ─── SubOrder (Multi-Seller Split) ──────────────────────────────────────────────────────
+model SubOrder {
+  id        String      @id @default(cuid())
+  orderId   String
+  sellerId  String
+  status    OrderStatus @default(PLACED)
+  total     Float       @default(0)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  order  Order       @relation(fields: [orderId], references: [id])
+  seller User        @relation("SellerSubOrders", fields: [sellerId], references: [id])
+  items  OrderItem[]
+
+  @@map("sub_order")
+}
+
+// ─── Coupons ───────────────────────────────────────────────────────────────────────────
+model Coupon {
+  id           String      @id @default(cuid())
+  code         String      @unique
+  type         CouponType  @default(PERCENTAGE)
+  value        Float
+  minOrderAmt  Float       @default(0)
+  maxUses      Int         @default(100)
+  usedCount    Int         @default(0)
+  isActive     Boolean     @default(true)
+  expiresAt    DateTime?
+  sellerId     String?
+  createdAt    DateTime    @default(now())
+
+  seller User?         @relation("SellerCoupons", fields: [sellerId], references: [id])
+  usages CouponUsage[]
+
+  @@map("coupon")
+}
+
+model CouponUsage {
+  id       String   @id @default(cuid())
+  couponId String
+  userId   String
+  orderId  String?
+  usedAt   DateTime @default(now())
+
+  coupon Coupon @relation(fields: [couponId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@unique([couponId, userId])
+  @@map("coupon_usage")
+}
+
+// ─── Seller License ───────────────────────────────────────────────────────────────────────
+model SellerLicense {
+  id             String        @id @default(cuid())
+  sellerId       String        @unique
+  licenseNumber  String
+  documentUrl    String
+  status         LicenseStatus @default(PENDING)
+  adminNote      String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  seller User @relation(fields: [sellerId], references: [id])
+
+  @@map("seller_license")
+}
+
+// ─── Notifications ──────────────────────────────────────────────────────────────────────────
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType @default(SYSTEM)
+  title     String
+  body      String
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("notification")
+}
+
+// ─── Order Tracking ─────────────────────────────────────────────────────────────────────────
+model OrderTracking {
+  id        String         @id @default(cuid())
+  orderId   String
+  status    TrackingStatus
+  note      String?
+  createdAt DateTime       @default(now())
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@map("order_tracking")
+}
+
+// ─── Return Request ─────────────────────────────────────────────────────────────────────────
+model ReturnRequest {
+  id        String       @id @default(cuid())
+  orderId   String       @unique
+  userId    String
+  reason    String
+  status    ReturnStatus @default(REQUESTED)
+  adminNote String?
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id])
+  user  User  @relation(fields: [userId], references: [id])
+
+  @@map("return_request")
+}
+
+// ─── Wishlist ─────────────────────────────────────────────────────────────────────────────────
+model Wishlist {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user  User           @relation(fields: [userId], references: [id])
+  items WishlistItem[]
+
+  @@map("wishlist")
+}
+
+model WishlistItem {
+  id         String   @id @default(cuid())
+  wishlistId String
+  medicineId String
+  addedAt    DateTime @default(now())
+
+  wishlist Wishlist @relation(fields: [wishlistId], references: [id], onDelete: Cascade)
+  medicine Medicine @relation(fields: [medicineId], references: [id])
+
+  @@unique([wishlistId, medicineId])
+  @@map("wishlist_item")
 }
 
 model Session {

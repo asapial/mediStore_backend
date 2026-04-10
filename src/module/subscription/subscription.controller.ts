@@ -47,7 +47,7 @@ const getMySubscriptions = catchAsync(async (req: Request, res: Response) => {
 // ─── CUSTOMER: update status ──────────────────────────────────────────────────
 const updateSubscriptionStatus = catchAsync(async (req: Request, res: Response) => {
   const userId = req.user.id;
-  const { id } = req.params;
+  const id = String(req.params.id);
   const { status: newStatus } = req.body;
 
   if (!newStatus) throw new AppError(status.BAD_REQUEST, "status is required");
@@ -58,12 +58,7 @@ const updateSubscriptionStatus = catchAsync(async (req: Request, res: Response) 
     newStatus as SubscriptionStatus
   );
 
-  sendResponse(res, {
-    status: status.OK,
-    success: true,
-    message: "Subscription updated",
-    data,
-  });
+  sendResponse(res, { status: status.OK, success: true, message: "Subscription updated", data });
 });
 
 // ─── SELLER: subscriptions for their medicines ────────────────────────────────

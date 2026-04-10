@@ -62,15 +62,9 @@ const getExpiringBatches = catchAsync(async (req: Request, res: Response) => {
 // ─── SELLER: delete a batch ───────────────────────────────────────────────────
 const deleteBatch = catchAsync(async (req: Request, res: Response) => {
   const sellerId = req.user.id;
-  const { id } = req.params;
+  const id = String(req.params.id);
   const data = await medicineBatchService.deleteBatch(id, sellerId);
-
-  sendResponse(res, {
-    status: status.OK,
-    success: true,
-    message: "Batch deleted",
-    data,
-  });
+  sendResponse(res, { status: status.OK, success: true, message: "Batch deleted", data });
 });
 
 export const medicineBatchController = {

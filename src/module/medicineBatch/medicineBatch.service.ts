@@ -25,7 +25,7 @@ const createBatch = async (sellerId: string, input: CreateBatchInput) => {
       batchNumber: input.batchNumber,
       quantity: input.quantity,
       expiryDate: new Date(input.expiryDate),
-      purchaseDate: input.purchaseDate ? new Date(input.purchaseDate) : undefined,
+      ...(input.purchaseDate ? { purchaseDate: new Date(input.purchaseDate) } : {}),
     },
     include: {
       medicine: { select: { id: true, name: true } },

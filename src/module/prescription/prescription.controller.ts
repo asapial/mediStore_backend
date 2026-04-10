@@ -49,7 +49,7 @@ const getAllPrescriptions = catchAsync(async (req: Request, res: Response) => {
 });
 
 const reviewPrescription = catchAsync(async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = String(req.params.id);
   const { status: newStatus, adminNote } = req.body;
 
   if (!newStatus) throw new AppError(status.BAD_REQUEST, "status is required");
@@ -60,12 +60,7 @@ const reviewPrescription = catchAsync(async (req: Request, res: Response) => {
     adminNote
   );
 
-  sendResponse(res, {
-    status: status.OK,
-    success: true,
-    message: "Prescription reviewed",
-    data,
-  });
+  sendResponse(res, { status: status.OK, success: true, message: "Prescription reviewed", data });
 });
 
 export const prescriptionController = {

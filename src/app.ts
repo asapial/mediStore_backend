@@ -15,6 +15,12 @@ import { subscriptionRouter } from "./module/subscription/subscription.route";
 import { stockAlertRouter } from "./module/stockAlert/stockAlert.route";
 import { medicineBatchRouter } from "./module/medicineBatch/medicineBatch.route";
 import { searchRouter } from "./module/search/search.route";
+import { couponRouter } from "./module/coupon/coupon.route";
+import { sellerLicenseRouter } from "./module/sellerLicense/sellerLicense.route";
+import { notificationRouter } from "./module/notification/notification.route";
+import { returnRouter } from "./module/return/return.route";
+import { wishlistRouter } from "./module/wishlist/wishlist.route";
+import { subOrderRouter } from "./module/subOrder/subOrder.route";
 import { globalErrorHandler } from "./middleware/globalErrorHandler";
 
 const app: Application = express();
@@ -25,6 +31,7 @@ app.use(express.json());
 // ✅ CORS setup (must be FIRST)
 const allowedOrigins = [
   "http://localhost:3000",
+  "http://localhost:4000",
    "https://medi-store-frontend-khaki.vercel.app",
    "https://medistorefrontend.vercel.app"
 ].filter(Boolean);
@@ -67,13 +74,21 @@ app.use("/api/admin", adminRouter);
 app.use("/api/medicines", medicineRouter);
 app.use("/api/cart", cartRouter);
 
-// ─── New Feature Routes ───────────────────────────────────────────────────────
+// ─── Feature Set 1: Pharmacy Core ───────────────────────────────────────────────────
 app.use("/api/prescriptions", prescriptionRouter);
 app.use("/api/wallet", walletRouter);
 app.use("/api/subscriptions", subscriptionRouter);
 app.use("/api/stock-alerts", stockAlertRouter);
 app.use("/api/batches", medicineBatchRouter);
 app.use("/api/search", searchRouter);
+
+// ─── Feature Set 2: Commerce & Engagement ───────────────────────────────────────
+app.use("/api/coupons", couponRouter);
+app.use("/api/seller-license", sellerLicenseRouter);
+app.use("/api/notifications", notificationRouter);
+app.use("/api/returns", returnRouter);
+app.use("/api/wishlist", wishlistRouter);
+app.use("/api/sub-orders", subOrderRouter);
 
 // Better Auth middleware
 app.all("/api/auth/*splat", toNodeHandler(auth));

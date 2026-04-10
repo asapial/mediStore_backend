@@ -4,7 +4,11 @@ import { prisma } from "../../lib/prisma";
 // ─── Customer: upload a prescription ─────────────────────────────────────────
 const uploadPrescription = async (userId: string, imageUrl: string, notes?: string) => {
   return prisma.prescription.create({
-    data: { userId, imageUrl, notes },
+    data: {
+      userId,
+      imageUrl,
+      ...(notes !== undefined ? { notes } : {}),
+    },
   });
 };
 
@@ -19,7 +23,7 @@ const getMyPrescriptions = async (userId: string) => {
 // ─── Admin: list all prescriptions ───────────────────────────────────────────
 const getAllPrescriptions = async (status?: PrescriptionStatus) => {
   return prisma.prescription.findMany({
-    where: status ? { status } : undefined,
+    where: status !== undefined ? { status } : {},
     include: {
       user: { select: { id: true, name: true, email: true } },
     },
@@ -35,7 +39,10 @@ const reviewPrescription = async (
 ) => {
   return prisma.prescription.update({
     where: { id },
-    data: { status, adminNote },
+    data: {
+      status,
+      ...(adminNote !== undefined ? { adminNote } : {}),
+    },
   });
 };
 

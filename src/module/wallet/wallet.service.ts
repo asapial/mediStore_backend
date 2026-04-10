@@ -34,7 +34,7 @@ const creditWallet = async (userId: string, amount: number, description?: string
         walletId: wallet.id,
         amount,
         type: TransactionType.DEPOSIT,
-        description,
+        ...(description !== undefined ? { description } : {}),
       },
     }),
   ]);
@@ -57,7 +57,7 @@ const debitWallet = async (userId: string, amount: number, description?: string)
         walletId: wallet.id,
         amount,
         type: TransactionType.PURCHASE,
-        description,
+        ...(description !== undefined ? { description } : {}),
       },
     }),
   ]);

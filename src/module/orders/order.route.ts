@@ -6,10 +6,11 @@ const router=Router();
 
 
 
-router.post("/",auth([ "CUSTOMER"]),orderController.createOrder);
-router.get("/",auth([ "CUSTOMER"]),orderController.getUsersOrder);
-router.get("/:id",auth([ "CUSTOMER"]),orderController.getOrderDetails);
-router.delete("/:id",auth([ "CUSTOMER"]),orderController.orderDeleteByCustomer);
+router.post("/", auth(["CUSTOMER"]), orderController.createOrder);
+router.get("/", auth(["CUSTOMER", "ADMIN"]), orderController.getUsersOrder);
+router.get("/my", auth(["CUSTOMER"]), orderController.getUsersOrder);  // alias used by frontend
+router.get("/:id", auth(["CUSTOMER", "ADMIN"]), orderController.getOrderDetails);
+router.delete("/:id", auth(["CUSTOMER"]), orderController.orderDeleteByCustomer);
 
 export const orderRouter=router;
 
