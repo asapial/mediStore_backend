@@ -27,6 +27,31 @@ enum OrderStatus {
   CANCELLED
 }
 
+enum PrescriptionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum TransactionType {
+  DEPOSIT
+  WITHDRAWAL
+  PURCHASE
+  REFUND
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAUSED
+  CANCELLED
+}
+
+enum SubscriptionFrequency {
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+}
+
 model User {
   id        String   @id @default(cuid())
   name      String
@@ -45,7 +70,11 @@ model User {
   sessions      Session[]
   accounts      Account[]
   // @@map("user")
-  cart          Cart?
+  cart                 Cart?
+  wallet               Wallet?
+  prescriptions        Prescription[]
+  subscriptions        Subscription[]
+  sellerSubscriptions  Subscription[]      @relation("SellerSubscriptions")
 
   @@map("user")
 }
@@ -64,16 +93,46 @@ model Medicine {
   price        Float
   stock        Int
   manufacturer String
+  genericName  String?
   sellerId     String
   categoryId   String
   createdAt    DateTime @default(now())
 
-  seller     User        @relation(fields: [sellerId], references: [id])
-  category   Category    @relation(fields: [categoryId], references: [id])
-  // category   String[]
-  reviews    Review[]
-  orderItems OrderItem[]
-  cartItems  CartItem[]
+  seller        User            @relation(fields: [sellerId], references: [id])
+  category      Category        @relation(fields: [categoryId], references: [id])
+  reviews       Review[]
+  orderItems    OrderItem[]
+  cartItems     CartItem[]
+  batches       MedicineBatch[]
+  stockAlert    StockAlert?
+  subscriptions Subscription[]
+}
+
+model MedicineBatch {
+  id           String   @id @default(cuid())
+  medicineId   String
+  batchNumber  String
+  quantity     Int
+  expiryDate   DateTime
+  purchaseDate DateTime @default(now())
+  createdAt    DateTime @default(now())
+
+  medicine Medicine @relation(fields: [medicineId], references: [id])
+
+  @@map("medicine_batch")
+}
+
+model StockAlert {
+  id         String   @id @default(cuid())
+  medicineId String   @unique
+  threshold  Int      @default(10)
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  medicine Medicine @relation(fields: [medicineId], references: [id])
+
+  @@map("stock_alert")
 }
 
 model Order {
@@ -94,8 +153,68 @@ model OrderItem {
   quantity   Int
   status     OrderStatus @default(PLACED)
   price      Float
-  order    Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order      Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  medicine   Medicine    @relation(fields: [medicineId], references: [id])
+}
+
+model Prescription {
+  id        String             @id @default(cuid())
+  userId    String
+  imageUrl  String
+  notes     String?
+  status    PrescriptionStatus @default(PENDING)
+  adminNote String?
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("prescription")
+}
+
+model Wallet {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  balance   Float    @default(0.0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user         User                @relation(fields: [userId], references: [id])
+  transactions WalletTransaction[]
+
+  @@map("wallet")
+}
+
+model WalletTransaction {
+  id          String          @id @default(cuid())
+  walletId    String
+  amount      Float
+  type        TransactionType
+  description String?
+  createdAt   DateTime        @default(now())
+
+  wallet Wallet @relation(fields: [walletId], references: [id])
+
+  @@map("wallet_transaction")
+}
+
+model Subscription {
+  id           String                @id @default(cuid())
+  userId       String
+  medicineId   String
+  sellerId     String
+  quantity     Int                   @default(1)
+  frequency    SubscriptionFrequency @default(MONTHLY)
+  status       SubscriptionStatus    @default(ACTIVE)
+  nextRefillAt DateTime
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+
+  user     User     @relation(fields: [userId], references: [id])
   medicine Medicine @relation(fields: [medicineId], references: [id])
+  seller   User     @relation("SellerSubscriptions", fields: [sellerId], references: [id])
+
+  @@map("subscription")
 }
 
 // Cart model for storing a user's active shopping cart

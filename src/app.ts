@@ -9,6 +9,13 @@ import { authRouter } from "./module/auth/auth.route";
 import cookieParser from "cookie-parser";
 import { medicineRouter } from "./module/medicine/medicine.router";
 import { cartRouter } from "./module/cart/cart.router";
+import { prescriptionRouter } from "./module/prescription/prescription.route";
+import { walletRouter } from "./module/wallet/wallet.route";
+import { subscriptionRouter } from "./module/subscription/subscription.route";
+import { stockAlertRouter } from "./module/stockAlert/stockAlert.route";
+import { medicineBatchRouter } from "./module/medicineBatch/medicineBatch.route";
+import { searchRouter } from "./module/search/search.route";
+import { globalErrorHandler } from "./middleware/globalErrorHandler";
 
 const app: Application = express();
 app.use(cookieParser());
@@ -52,13 +59,21 @@ app.use(
 
 
 
-// Routes
+// ─── Core Routes ────────────────────────────────────────────────────────────
 app.use("/api/auth", authRouter);
 app.use("/api/seller", sellerRouter);
 app.use("/api/orders", orderRouter);
 app.use("/api/admin", adminRouter);
 app.use("/api/medicines", medicineRouter);
 app.use("/api/cart", cartRouter);
+
+// ─── New Feature Routes ───────────────────────────────────────────────────────
+app.use("/api/prescriptions", prescriptionRouter);
+app.use("/api/wallet", walletRouter);
+app.use("/api/subscriptions", subscriptionRouter);
+app.use("/api/stock-alerts", stockAlertRouter);
+app.use("/api/batches", medicineBatchRouter);
+app.use("/api/search", searchRouter);
 
 // Better Auth middleware
 app.all("/api/auth/*splat", toNodeHandler(auth));
@@ -81,5 +96,7 @@ app.get("/health", (_req, res) => {
   });
 });
 
-export default app;
+// ─── Global Error Handler (must be LAST middleware) ─────────────────────────
+app.use(globalErrorHandler);
 
+export default app;

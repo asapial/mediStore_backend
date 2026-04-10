@@ -5,8 +5,9 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "npx tsx watch src/server.ts",
-    "seeding": "npx tsx  src/scripts/seedingAdmin.ts",
-    "dmp": "npx prisma migrate dev generate",
+    "seeding": "npx tsx src/scripts/seedingAdmin.ts",
+    "migrate": "npx prisma migrate dev",
+    "generate": "npx prisma generate",
     "postinstall": "prisma generate",
     "build": "prisma generate && tsup src/server.ts --format esm --platform node --target node20 --outDir api --external pg-native"
   },
@@ -29,12 +30,16 @@
   "dependencies": {
     "@prisma/adapter-pg": "^7.2.0",
     "@prisma/client": "^7.2.0",
+    "@types/multer": "^2.1.0",
     "better-auth": "^1.4.9",
+    "cloudinary": "^2.9.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
     "http-status": "^2.1.0",
+    "multer": "^2.1.1",
+    "multer-storage-cloudinary": "^4.0.0",
     "nodemailer": "^7.0.12",
     "pg": "^8.16.3",
     "vercel": "^50.9.6",
