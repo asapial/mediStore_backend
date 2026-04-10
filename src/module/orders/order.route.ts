@@ -6,10 +6,10 @@ const router=Router();
 
 
 
-router.post("/",auth(),orderController.createOrder);
-router.get("/",auth(),orderController.getUsersOrder);
-router.get("/:id",auth(),orderController.getOrderDetails);
-router.delete("/:id",auth(),orderController.orderDeleteByCustomer);
+router.post("/",auth([ "CUSTOMER"]),orderController.createOrder);
+router.get("/",auth([ "CUSTOMER"]),orderController.getUsersOrder);
+router.get("/:id",auth([ "CUSTOMER"]),orderController.getOrderDetails);
+router.delete("/:id",auth([ "CUSTOMER"]),orderController.orderDeleteByCustomer);
 
 export const orderRouter=router;
 

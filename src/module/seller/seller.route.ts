@@ -6,12 +6,12 @@ const router = Router();
 
 
 
-router.post("/medicines",auth(), sellerController.postMedicine);
-router.put("/medicines/:id", sellerController.updateMedicine);
-router.delete("/medicines/:id", sellerController.deleteMedicine);
-router.get("/orders",auth(),sellerController.getSellerOrder)
+router.post("/medicines",auth([ "SELLER"]), sellerController.postMedicine);
+router.put("/medicines/:id",auth([ "SELLER"]), sellerController.updateMedicine);
+router.delete("/medicines/:id",auth([ "SELLER"]), sellerController.deleteMedicine);
+router.get("/orders",auth([ "SELLER"]),sellerController.getSellerOrder)
 router.get("/stat", auth(), sellerController.sellerStatController);
-router.put("/orders",sellerController.updateOrderItemStatus);
+router.put("/orders",auth([ "SELLER"]),sellerController.updateOrderItemStatus);
 
 
 

@@ -229,7 +229,17 @@ const updateUserByAdmin = async (
   });
 };
 
+const deleteCategoryQuery = async (id: string) => {
+  return prisma.category.delete({
+    where: { id },
+  });
+};
 
+const createCategoryQuery = async (name: string) => {
+  return prisma.category.create({
+    data: { name },
+  });
+};
 
 export const adminService = {
     getAllUsersQuery,
@@ -240,5 +250,7 @@ export const adminService = {
     getAdminStatsService,
     getAllOrder,
     banUserService,
-    updateUserByAdmin
+    updateUserByAdmin,
+    createCategoryQuery,
+    deleteCategoryQuery
 }

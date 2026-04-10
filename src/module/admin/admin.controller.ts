@@ -95,6 +95,52 @@ const getAllCategory = async (
     }
 }
 
+const createCategory = async (req: Request, res: Response) => {
+  try {
+    const { name } = req.body;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({
+        status: false,
+        message: "Category name is required",
+      });
+    }
+
+    const result = await adminService.createCategoryQuery(name);
+
+    res.status(201).json({
+      status: true,
+      message: "Category created successfully",
+      data: result,
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: false,
+      message: "Internal server error",
+      error,
+    });
+  }
+};
+
+const deleteCategory = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    await adminService.deleteCategoryQuery(id as string);
+
+    res.status(200).json({
+      status: true,
+      message: "Category deleted successfully",
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: false,
+      message: "Internal server error",
+      error,
+    });
+  }
+}
+
 const updateUser = async (
     req: Request,
     res: Response,
@@ -264,5 +310,7 @@ export const adminController = {
     getAdminStatsController,
     getAllOrder,
     banUserController,
-    adminUpdateUser
+    adminUpdateUser,
+    createCategory,
+    deleteCategory
 }

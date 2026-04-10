@@ -11,22 +11,18 @@ import { medicineRouter } from "./module/medicine/medicine.router";
 import { cartRouter } from "./module/cart/cart.router";
 
 const app: Application = express();
+app.use(cookieParser());
+app.use(express.json());
+
 
 // ✅ CORS setup (must be FIRST)
 const allowedOrigins = [
   "http://localhost:3000",
-   "https://medi-store-frontend-khaki.vercel.app"
+   "https://medi-store-frontend-khaki.vercel.app",
+   "https://medistorefrontend.vercel.app"
 ].filter(Boolean);
 
-const corsOptions = {
-  origin: allowedOrigins,
-  // origin:  "http://localhost:3000" ,
-  // origin: "https://medi-store-frontend-khaki.vercel.app" ,
-  credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-  optionsSuccessStatus: 200,
-};
+
 
 app.use(
   cors({
@@ -52,20 +48,9 @@ app.use(
     exposedHeaders: ["Set-Cookie"],
   }),
 );
-// const corsOptions = {
-//   // origin: allowedOrigins ,
-//   origin:  "http://localhost:3000" ,
-//   // origin: "https://medi-store-frontend-khaki.vercel.app" ,
-//   credentials: true,
-//   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-//   allowedHeaders: ["Content-Type", "Authorization"],
-//   optionsSuccessStatus: 200,
-// };
 
 
-// app.use(cors(corsOptions));
-app.use(cookieParser());
-app.use(express.json());
+
 
 // Routes
 app.use("/api/auth", authRouter);

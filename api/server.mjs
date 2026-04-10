@@ -850,12 +850,12 @@ var init_seller_route = __esm({
     init_seller_controller();
     init_auth_middleware();
     router = Router();
-    router.post("/medicines", auth_middleware_default(), sellerController.postMedicine);
-    router.put("/medicines/:id", sellerController.updateMedicine);
-    router.delete("/medicines/:id", sellerController.deleteMedicine);
-    router.get("/orders", auth_middleware_default(), sellerController.getSellerOrder);
+    router.post("/medicines", auth_middleware_default(["SELLER"]), sellerController.postMedicine);
+    router.put("/medicines/:id", auth_middleware_default(["SELLER"]), sellerController.updateMedicine);
+    router.delete("/medicines/:id", auth_middleware_default(["SELLER"]), sellerController.deleteMedicine);
+    router.get("/orders", auth_middleware_default(["SELLER"]), sellerController.getSellerOrder);
     router.get("/stat", auth_middleware_default(), sellerController.sellerStatController);
-    router.put("/orders", sellerController.updateOrderItemStatus);
+    router.put("/orders", auth_middleware_default(["SELLER"]), sellerController.updateOrderItemStatus);
     sellerRouter = router;
   }
 });
@@ -1069,16 +1069,16 @@ var init_order_route = __esm({
     init_order_controller();
     init_auth_middleware();
     router2 = Router2();
-    router2.post("/", auth_middleware_default(), orderController.createOrder);
-    router2.get("/", auth_middleware_default(), orderController.getUsersOrder);
-    router2.get("/:id", auth_middleware_default(), orderController.getOrderDetails);
-    router2.delete("/:id", auth_middleware_default(), orderController.orderDeleteByCustomer);
+    router2.post("/", auth_middleware_default(["CUSTOMER"]), orderController.createOrder);
+    router2.get("/", auth_middleware_default(["CUSTOMER"]), orderController.getUsersOrder);
+    router2.get("/:id", auth_middleware_default(["CUSTOMER"]), orderController.getOrderDetails);
+    router2.delete("/:id", auth_middleware_default(["CUSTOMER"]), orderController.orderDeleteByCustomer);
     orderRouter = router2;
   }
 });
 
 // src/module/admin/admin.service.ts
-var getAllUsersQuery, getAllCategoryQuery, getUserDetailsQuery, updateUserQuery, updateCategoryQuery, getAdminStatsService, getAllOrder, banUserService, updateUserByAdmin, adminService;
+var getAllUsersQuery, getAllCategoryQuery, getUserDetailsQuery, updateUserQuery, updateCategoryQuery, getAdminStatsService, getAllOrder, banUserService, updateUserByAdmin, deleteCategoryQuery, createCategoryQuery, adminService;
 var init_admin_service = __esm({
   "src/module/admin/admin.service.ts"() {
     "use strict";
@@ -1255,6 +1255,16 @@ var init_admin_service = __esm({
         }
       });
     };
+    deleteCategoryQuery = async (id) => {
+      return prisma.category.delete({
+        where: { id }
+      });
+    };
+    createCategoryQuery = async (name) => {
+      return prisma.category.create({
+        data: { name }
+      });
+    };
     adminService = {
       getAllUsersQuery,
       getAllCategoryQuery,
@@ -1264,13 +1274,15 @@ var init_admin_service = __esm({
       getAdminStatsService,
       getAllOrder,
       banUserService,
-      updateUserByAdmin
+      updateUserByAdmin,
+      createCategoryQuery,
+      deleteCategoryQuery
     };
   }
 });
 
 // src/module/admin/admin.controller.ts
-var getAllUsers, getUserDetails, getAllCategory, updateUser, updateCategory, getAdminStatsController, getAllOrder2, banUserController, adminUpdateUser, adminController;
+var getAllUsers, getUserDetails, getAllCategory, createCategory, deleteCategory, updateUser, updateCategory, getAdminStatsController, getAllOrder2, banUserController, adminUpdateUser, adminController;
 var init_admin_controller = __esm({
   "src/module/admin/admin.controller.ts"() {
     "use strict";
@@ -1330,6 +1342,45 @@ var init_admin_controller = __esm({
         });
       } catch (error) {
         return res.status(500).json({
+          status: false,
+          message: "Internal server error",
+          error
+        });
+      }
+    };
+    createCategory = async (req, res) => {
+      try {
+        const { name } = req.body;
+        if (!name || !name.trim()) {
+          return res.status(400).json({
+            status: false,
+            message: "Category name is required"
+          });
+        }
+        const result = await adminService.createCategoryQuery(name);
+        res.status(201).json({
+          status: true,
+          message: "Category created successfully",
+          data: result
+        });
+      } catch (error) {
+        res.status(500).json({
+          status: false,
+          message: "Internal server error",
+          error
+        });
+      }
+    };
+    deleteCategory = async (req, res) => {
+      try {
+        const { id } = req.params;
+        await adminService.deleteCategoryQuery(id);
+        res.status(200).json({
+          status: true,
+          message: "Category deleted successfully"
+        });
+      } catch (error) {
+        res.status(500).json({
           status: false,
           message: "Internal server error",
           error
@@ -1449,7 +1500,9 @@ var init_admin_controller = __esm({
       getAdminStatsController,
       getAllOrder: getAllOrder2,
       banUserController,
-      adminUpdateUser
+      adminUpdateUser,
+      createCategory,
+      deleteCategory
     };
   }
 });
@@ -1463,19 +1516,21 @@ var init_admin_route = __esm({
     init_admin_controller();
     init_auth_middleware();
     router3 = Router3();
-    router3.get("/users", adminController.getAllUsers);
+    router3.get("/users", auth_middleware_default(["ADMIN"]), adminController.getAllUsers);
     router3.get("/users/:id", adminController.getUserDetails);
     router3.get("/categories", adminController.getAllCategory);
-    router3.put("/categories/:id", adminController.updateCategory);
+    router3.post("/categories", auth_middleware_default(["ADMIN"]), adminController.createCategory);
+    router3.delete("/categories/:id", auth_middleware_default(["ADMIN"]), adminController.deleteCategory);
+    router3.put("/categories/:id", auth_middleware_default(["ADMIN"]), adminController.updateCategory);
     router3.put("/users/:id", adminController.updateUser);
-    router3.get("/stats", auth_middleware_default(), adminController.getAdminStatsController);
-    router3.get("/order", adminController.getAllOrder);
+    router3.get("/stats", auth_middleware_default(["ADMIN"]), adminController.getAdminStatsController);
+    router3.get("/order", auth_middleware_default(["ADMIN"]), adminController.getAllOrder);
     router3.patch(
       "/users/:userId/ban",
-      auth_middleware_default(),
+      auth_middleware_default(["ADMIN"]),
       adminController.banUserController
     );
-    router3.patch("/users/:id", auth_middleware_default(), adminController.adminUpdateUser);
+    router3.patch("/users/:id", auth_middleware_default(["ADMIN"]), adminController.adminUpdateUser);
     adminRouter = router3;
   }
 });
@@ -1615,7 +1670,7 @@ var init_auth_route = __esm({
     router4.post("/register", authController.registerController);
     router4.post("/login", authController.loginController);
     router4.get("/me", auth_middleware_default(["CUSTOMER", "SELLER", "ADMIN"]), authController.meController);
-    router4.patch("/update", auth_middleware_default(), authController.updateProfileController);
+    router4.patch("/update", auth_middleware_default(["CUSTOMER", "SELLER", "ADMIN"]), authController.updateProfileController);
     authRouter = router4;
   }
 });
@@ -1776,7 +1831,7 @@ var init_medicine_router = __esm({
     init_auth_middleware();
     router5 = Router5();
     router5.get("/", medicineController.getAllMedicines);
-    router5.get("/own", auth_middleware_default(), medicineController.getMyMedicines);
+    router5.get("/own", auth_middleware_default(["SELLER"]), medicineController.getMyMedicines);
     router5.get("/:id", medicineController.getMedicineById);
     medicineRouter = router5;
   }
@@ -2010,11 +2065,11 @@ var init_cart_router = __esm({
     init_auth_middleware();
     init_cart_controller();
     router6 = Router6();
-    router6.get("/", auth_middleware_default(), cartController.getFromCartController);
+    router6.get("/", auth_middleware_default(["CUSTOMER"]), cartController.getFromCartController);
     router6.post("/add", auth_middleware_default(), cartController.addToCartController);
     router6.get("/status/:medicineId", auth_middleware_default(), cartController.getMedicineCartStatusController);
-    router6.patch("/update", auth_middleware_default(), cartController.updateCartItemController);
-    router6.delete("/remove", auth_middleware_default(), cartController.removeCartItemController);
+    router6.patch("/update", auth_middleware_default(["CUSTOMER"]), cartController.updateCartItemController);
+    router6.delete("/remove", auth_middleware_default(["CUSTOMER"]), cartController.removeCartItemController);
     cartRouter = router6;
   }
 });
@@ -2036,9 +2091,12 @@ var init_app = __esm({
     init_medicine_router();
     init_cart_router();
     app = express();
+    app.use(cookieParser());
+    app.use(express.json());
     allowedOrigins = [
       "http://localhost:3000",
-      "https://medi-store-frontend-khaki.vercel.app"
+      "https://medi-store-frontend-khaki.vercel.app",
+      "https://medistorefrontend.vercel.app"
     ].filter(Boolean);
     app.use(
       cors({
@@ -2057,8 +2115,6 @@ var init_app = __esm({
         exposedHeaders: ["Set-Cookie"]
       })
     );
-    app.use(cookieParser());
-    app.use(express.json());
     app.use("/api/auth", authRouter);
     app.use("/api/seller", sellerRouter);
     app.use("/api/orders", orderRouter);
