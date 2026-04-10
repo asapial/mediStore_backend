@@ -33,4 +33,10 @@ const reviewLicense = catchAsync(async (req: Request, res: Response) => {
   sendResponse(res, { status: status.OK, success: true, message: "License reviewed", data });
 });
 
-export const sellerLicenseController = { submitLicense, getMyLicense, getAllLicenses, reviewLicense };
+const deleteLicense = catchAsync(async (req: Request, res: Response) => {
+  const licenseId = String(req.params.licenseId);
+  const data = await sellerLicenseService.deleteLicense(licenseId);
+  sendResponse(res, { status: status.OK, success: true, message: "License deleted", data });
+});
+
+export const sellerLicenseController = { submitLicense, getMyLicense, getAllLicenses, reviewLicense, deleteLicense };

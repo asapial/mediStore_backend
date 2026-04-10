@@ -19,8 +19,6 @@ const getAllCoupons = catchAsync(async (req: Request, res: Response) => {
 const createCoupon = catchAsync(async (req: Request, res: Response) => {
   const { code, type, value, minOrderAmt, maxUses, expiresAt } = req.body;
 
-  console.log("HI from coupons")
-
   if (!code)  throw new AppError(status.BAD_REQUEST, "code is required");
   if (!type)  throw new AppError(status.BAD_REQUEST, "type is required (PERCENTAGE or FIXED)");
   if (value === undefined || value === null)

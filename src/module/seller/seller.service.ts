@@ -85,10 +85,9 @@ const deleteMedicineQuery = async (id: string) => {
 
 
 const getSellerOrderQuery = async (id: string) => {
-
-    console.log("sessss", id)
     const orders = await prisma.order.findMany({
         include: {
+            user: { select: { name: true, email: true } },
             items: {
                 select: {
                     id: true,
@@ -96,20 +95,18 @@ const getSellerOrderQuery = async (id: string) => {
                     medicineId: true,
                     quantity: true,
                     price: true,
-                    status:true,
+                    status: true,
                     medicine: {
                         select: {
                             sellerId: true,
-                            name: true
+                            name: true,
+                            image: true,
                         }
                     }
-
                 }
             }
         }
-    })
-
-    console.log(orders)
+    });
 
     const filteredOrders = orders.flatMap(order => {
         const items = order.items.filter(
@@ -123,6 +120,7 @@ const getSellerOrderQuery = async (id: string) => {
             status: order.status,
             address: order.address,
             createdAt: order.createdAt,
+            user: { name: (order as any).user?.name ?? "—", email: (order as any).user?.email ?? "—" },
             items,
         }];
     });

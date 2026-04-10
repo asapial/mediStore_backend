@@ -11,5 +11,6 @@ router.get("/my", auth(["SELLER"]), sellerLicenseController.getMyLicense);
 // ADMIN
 router.get("/", auth(["ADMIN"]), sellerLicenseController.getAllLicenses);
 router.patch("/:sellerId/review", auth(["ADMIN"]), sellerLicenseController.reviewLicense);
+router.delete("/:licenseId", auth(["ADMIN"]), sellerLicenseController.deleteLicense);
 
 export const sellerLicenseRouter = router;

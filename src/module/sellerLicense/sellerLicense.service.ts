@@ -51,9 +51,17 @@ const reviewLicense = async (
   });
 };
 
+// ─── Admin: delete license by license id ─────────────────────────────────────
+const deleteLicense = async (licenseId: string) => {
+  const license = await prisma.sellerLicense.findUnique({ where: { id: licenseId } });
+  if (!license) throw new AppError(status.NOT_FOUND, "License not found");
+  return prisma.sellerLicense.delete({ where: { id: licenseId } });
+};
+
 export const sellerLicenseService = {
   submitLicense,
   getMyLicense,
   getAllLicenses,
   reviewLicense,
+  deleteLicense,
 };

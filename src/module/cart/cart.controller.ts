@@ -127,10 +127,19 @@ const removeCartItemController = async (
   }
 };
 
+const clearCartController = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user.id;
+    const result = await cartService.clearCartService(userId);
+    return res.status(200).json({ success: true, message: "Cart cleared", data: result });
+  } catch (error) { next(error); }
+};
+
 export const cartController={
-addToCartController,
-getMedicineCartStatusController,
-getFromCartController,
-updateCartItemController,
-removeCartItemController
+  addToCartController,
+  getMedicineCartStatusController,
+  getFromCartController,
+  updateCartItemController,
+  removeCartItemController,
+  clearCartController,
 }
