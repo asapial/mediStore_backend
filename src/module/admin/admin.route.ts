@@ -22,4 +22,8 @@ router.patch(
 
 router.patch("/users/:id", auth([ "ADMIN"]), adminController.adminUpdateUser);
 
+// Category featured & metadata
+router.patch("/categories/:id/featured", auth(["ADMIN"]), adminController.toggleCategoryFeatured);
+router.patch("/categories/:id/meta",    auth(["ADMIN"]), adminController.updateCategoryMeta);
+
 export const adminRouter=router;

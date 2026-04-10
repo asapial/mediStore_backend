@@ -21,6 +21,13 @@ import { notificationRouter } from "./module/notification/notification.route";
 import { returnRouter } from "./module/return/return.route";
 import { wishlistRouter } from "./module/wishlist/wishlist.route";
 import { subOrderRouter } from "./module/subOrder/subOrder.route";
+import { bannerRouter } from "./module/banner/banner.route";
+import { platformFeatureRouter } from "./module/platformFeature/platformFeature.route";
+import { flashSaleRouter } from "./module/flashSale/flashSale.route";
+import { blogRouter } from "./module/blog/blog.route";
+import { testimonialRouter } from "./module/testimonial/testimonial.route";
+import { newsletterRouter } from "./module/newsletter/newsletter.route";
+import { paymentRouter } from "./module/payment/payment.route";
 import { globalErrorHandler } from "./middleware/globalErrorHandler";
 
 const app: Application = express();
@@ -32,8 +39,8 @@ app.use(express.json());
 const allowedOrigins = [
   "http://localhost:3000",
   "http://localhost:4000",
-   "https://medi-store-frontend-khaki.vercel.app",
-   "https://medistorefrontend.vercel.app"
+  "https://medi-store-frontend-khaki.vercel.app",
+  "https://medistorefrontend.vercel.app"
 ].filter(Boolean);
 
 
@@ -89,6 +96,15 @@ app.use("/api/notifications", notificationRouter);
 app.use("/api/returns", returnRouter);
 app.use("/api/wishlist", wishlistRouter);
 app.use("/api/sub-orders", subOrderRouter);
+
+// ─── Feature Set 3: Homepage CMS ─────────────────────────────────────────────
+app.use("/api/banners", bannerRouter);
+app.use("/api/platform-features", platformFeatureRouter);
+app.use("/api/flash-sales", flashSaleRouter);
+app.use("/api/blogs", blogRouter);
+app.use("/api/testimonials", testimonialRouter);
+app.use("/api/newsletter", newsletterRouter);
+app.use("/api/payments", paymentRouter);
 
 // Better Auth middleware
 app.all("/api/auth/*splat", toNodeHandler(auth));

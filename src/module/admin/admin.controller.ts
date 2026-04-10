@@ -69,24 +69,14 @@ const getAllCategory = async (
     res: Response,
     next: NextFunction
 ) => {
-
     try {
         const result = await adminService.getAllCategoryQuery();
-
-        if (result.length === 0) {
-            return res.status(404).json({
-                status: false,
-                message: "No categories found"
-            })
-        }
-
         res.status(200).json({
             status: true,
             message: "Categories fetched successfully",
             data: result
         })
     } catch (error) {
-
         return res.status(500).json({
             status: false,
             message: "Internal server error",
@@ -301,6 +291,35 @@ const adminUpdateUser = async (req: Request, res: Response) => {
 };
 
 
+const toggleCategoryFeatured = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const cat = await (await import("../../lib/prisma")).prisma.category.findUnique({ where: { id } });
+    if (!cat) return res.status(404).json({ status: false, message: "Category not found" });
+    const updated = await (await import("../../lib/prisma")).prisma.category.update({
+      where: { id },
+      data: { isFeatured: !cat.isFeatured },
+    });
+    return res.status(200).json({ status: true, message: `Category ${updated.isFeatured ? "featured" : "unfeatured"}`, data: updated });
+  } catch (error) {
+    return res.status(500).json({ status: false, message: "Internal server error", error });
+  }
+};
+
+const updateCategoryMeta = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { icon, color, name } = req.body;
+    const updated = await (await import("../../lib/prisma")).prisma.category.update({
+      where: { id },
+      data: { ...(icon ? { icon } : {}), ...(color ? { color } : {}), ...(name ? { name } : {}) },
+    });
+    return res.status(200).json({ status: true, message: "Category updated", data: updated });
+  } catch (error) {
+    return res.status(500).json({ status: false, message: "Internal server error", error });
+  }
+};
+
 export const adminController = {
     getAllUsers,
     getAllCategory,
@@ -312,5 +331,7 @@ export const adminController = {
     banUserController,
     adminUpdateUser,
     createCategory,
-    deleteCategory
+    deleteCategory,
+    toggleCategoryFeatured,
+    updateCategoryMeta,
 }

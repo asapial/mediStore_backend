@@ -1,4 +1,3 @@
-import { tr } from "zod/v4/locales";
 import { prisma } from "../../lib/prisma"
 import { updatedCategoryType, updateUserType } from "./admin.types";
 
@@ -18,9 +17,10 @@ const getAllUsersQuery = async () => {
 }
 
 const getAllCategoryQuery = async () => {
-
-    const result = await prisma.category.findMany();
-
+    const result = await prisma.category.findMany({
+        include: { _count: { select: { medicines: true } } },
+        orderBy: { name: "asc" },
+    });
     return result;
 }
 
