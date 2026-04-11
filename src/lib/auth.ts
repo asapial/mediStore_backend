@@ -16,10 +16,24 @@ export const auth = betterAuth({
     user: {
         additionalFields: {
             role: {
-                type: ["CUSTOMER", "SELLER", "ADMIN"],
+                type: ["CUSTOMER", "SELLER", "ADMIN"] as const,
                 required: false,
-                defaultValue: 'CUSTOMER',
-                input: false,
+                defaultValue: "CUSTOMER",
+                input: true,  // ✅ allow client to pass role during sign-up
+            }
+        }
+    },
+    databaseHooks: {
+        user: {
+            create: {
+                before: async (user: any) => {
+                    // Block self-registration as ADMIN
+                    const role = user.role;
+                    if (role === "ADMIN" || !["CUSTOMER", "SELLER"].includes(role)) {
+                        return { data: { ...user, role: "CUSTOMER" } };
+                    }
+                    return { data: user };
+                }
             }
         }
     },

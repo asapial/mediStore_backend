@@ -12,12 +12,15 @@ const registerController = async (
   next: NextFunction
 ) => {
   try {
-    const { email, password, name } = req.body;
+    const { email, password, name, role, image } = req.body;
+
+    // Block ADMIN self-registration
+    const safeRole = role === "ADMIN" ? "CUSTOMER" : (role || "CUSTOMER");
 
     // Sign up via BetterAuth
     const { headers, response } = await betterAuth.api.signUpEmail({
-      returnHeaders: true, // we need headers for cookies
-      body: { email, password, name },
+      returnHeaders: true,
+      body: { email, password, name, role: safeRole, image: image || undefined },
     });
 
     // Extract the set-cookie header from BetterAuth
@@ -28,7 +31,7 @@ const registerController = async (
 
     res.status(201).json({
       message: "Registration successful",
-      data: response, // optional: return user info
+      data: response,
     });
   } catch (error) {
     next(error);

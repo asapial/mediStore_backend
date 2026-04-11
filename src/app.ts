@@ -28,6 +28,7 @@ import { blogRouter } from "./module/blog/blog.route";
 import { testimonialRouter } from "./module/testimonial/testimonial.route";
 import { newsletterRouter } from "./module/newsletter/newsletter.route";
 import { paymentRouter } from "./module/payment/payment.route";
+import { contactRouter } from "./module/contact/contact.route";
 import { globalErrorHandler } from "./middleware/globalErrorHandler";
 
 const app: Application = express();
@@ -104,7 +105,8 @@ app.use("/api/flash-sales", flashSaleRouter);
 app.use("/api/blogs", blogRouter);
 app.use("/api/testimonials", testimonialRouter);
 app.use("/api/newsletter", newsletterRouter);
-app.use("/api/payments", paymentRouter);
+app.use("/api/payments",          paymentRouter);
+app.use("/api/contact",           contactRouter);
 
 // Better Auth middleware
 app.all("/api/auth/*splat", toNodeHandler(auth));

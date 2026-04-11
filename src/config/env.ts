@@ -48,6 +48,7 @@ const loadEnvVariables = (): EnvConfig => {
         ORIGIN_URL: process.env.ORIGIN_URL as string,
         BETTER_AUTH_URL: process.env.BETTER_AUTH_URL as string,
         BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET as string,
+            DATABASE_URL: process.env.DATABASE_URL as string,
         NODE_ENV: process.env.NODE_ENV as string,
                 CLOUDINARY: {
             CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME as string,
