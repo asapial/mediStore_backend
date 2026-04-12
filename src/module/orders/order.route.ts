@@ -7,8 +7,9 @@ const router=Router();
 
 
 router.post("/", auth(["CUSTOMER"]), orderController.createOrder);
+router.get("/stats", auth(["CUSTOMER"]), orderController.getCustomerStats);
 router.get("/", auth(["CUSTOMER", "ADMIN"]), orderController.getUsersOrder);
-router.get("/my", auth(["CUSTOMER"]), orderController.getUsersOrder);  // alias used by frontend
+router.get("/my", auth(["CUSTOMER"]), orderController.getUsersOrder);
 router.get("/:id", auth(["CUSTOMER", "ADMIN"]), orderController.getOrderDetails);
 router.delete("/:id", auth(["CUSTOMER"]), orderController.orderDeleteByCustomer);
 

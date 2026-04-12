@@ -1,10 +1,7 @@
 
-
-
 import { Request, Response, NextFunction } from "express";
 import { createOrderSchema } from "./order.types";
 import { orderService } from "./order.service";
-import { success } from "zod";
 
 
 const createOrder = async (
@@ -103,9 +100,19 @@ const orderDeleteByCustomer = async (
 
 
 
+
+const getCustomerStats = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const userId = req.user.id;
+        const stats = await orderService.getCustomerStats(userId);
+        res.status(200).json({ success: true, message: "Customer stats fetched", data: stats });
+    } catch (error) { next(error); }
+};
+
 export const orderController = {
     createOrder,
     getUsersOrder,
     getOrderDetails,
-    orderDeleteByCustomer
+    orderDeleteByCustomer,
+    getCustomerStats,
 }

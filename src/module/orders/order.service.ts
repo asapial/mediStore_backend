@@ -125,13 +125,32 @@ const deleteOrderByCustomer = async (orderId: string) => {
     return { message: "Order deleted successfully" };
 }
 
+const getCustomerStats = async (userId: string) => {
+    const [orders, wishlistCount] = await Promise.all([
+        prisma.order.findMany({
+            where: { userId },
+            include: { items: { select: { price: true, quantity: true } } },
+        }),
+        prisma.wishlist.count({ where: { userId } }),
+    ]);
 
+    const totalOrders    = orders.length;
+    const deliveredCount = orders.filter(o => o.status === "DELIVERED").length;
+    const activeCount    = orders.filter(o =>
+        ["PLACED", "PROCESSING", "SHIPPED", "CONFIRMED"].includes(o.status)
+    ).length;
+    const totalSpent     = orders.reduce(
+        (sum, o) => sum + o.items.reduce((s, i) => s + i.price * i.quantity, 0), 0
+    );
 
+    return { totalOrders, deliveredCount, activeCount, totalSpent, wishlistCount };
+};
 
 
 export const orderService = {
     postOrderQuery,
     getUserOrdersQuery,
     getOrderDetailsQuery,
-    deleteOrderByCustomer
+    deleteOrderByCustomer,
+    getCustomerStats,
 }
