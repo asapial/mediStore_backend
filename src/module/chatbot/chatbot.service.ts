@@ -2,7 +2,7 @@ import { prisma } from "../../lib/prisma";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const MODEL          = "google/gemma-3-4b-it:free";
-const PLACEHOLDER    = "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";
+
 
 interface Message {
     role: "user" | "assistant";
@@ -278,7 +278,7 @@ Assistant:`;
 // ─── Guest chat ───────────────────────────────────────────────────────────────
 const guestChat = async (message: string, history: Message[]) => {
     const key = process.env.OPENROUTER_API_KEY ?? "";
-    if (!key || key === PLACEHOLDER) {
+    if (!key) {
         throw new Error("AI service is not yet configured. Please add a valid OPENROUTER_API_KEY to the backend .env file.");
     }
 

@@ -79,6 +79,47 @@ router.post("/", auth(), catchAsync(async (req: Request, res: Response) => {
   sendResponse(res, { status: status.CREATED, success: true, message: "Blog submitted for review", data: blog });
 }));
 
+// PUT /api/blogs/:id — author edits their own blog (resets to pending review)
+router.put("/:id", auth(), catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { title, summary, content, image, tags } = req.body;
+
+  const existing = await prisma.blog.findUnique({ where: { id } });
+  if (!existing) {
+    return sendResponse(res, { status: status.NOT_FOUND, success: false, message: "Blog not found", data: null });
+  }
+  // Only the author (or admin) can edit
+  if (existing.userId !== req.user.id && req.user.role !== "ADMIN") {
+    return sendResponse(res, { status: status.FORBIDDEN, success: false, message: "Not authorized to edit this blog", data: null });
+  }
+
+  // If a non-admin edits, reset to pending review
+  const shouldReset = req.user.role !== "ADMIN";
+
+  // Re-generate slug if title changed
+  let slug = existing.slug;
+  if (title && title.trim() !== existing.title) {
+    const baseSlug = makeSlug(title.trim());
+    slug = baseSlug;
+    let i = 1;
+    while (await prisma.blog.findFirst({ where: { slug, NOT: { id } } })) { slug = `${baseSlug}-${i++}`; }
+  }
+
+  const blog = await prisma.blog.update({
+    where: { id },
+    data: {
+      ...(title   ? { title: title.trim(), slug } : {}),
+      ...(summary ? { summary: summary.trim() }   : {}),
+      ...(content ? { content: content.trim() }   : {}),
+      image: image !== undefined ? (image || null) : existing.image,
+      tags: Array.isArray(tags) ? tags : (tags ? [tags] : existing.tags),
+      ...(shouldReset ? { isPublished: false, isFeatured: false, publishedAt: null } : {}),
+    },
+    include: { author: { select: { id: true, name: true, image: true } } },
+  });
+  sendResponse(res, { status: status.OK, success: true, message: shouldReset ? "Blog updated — pending admin review" : "Blog updated", data: blog });
+}));
+
 // PATCH /api/blogs/admin/:id — publish/feature
 router.patch("/admin/:id", auth(["ADMIN"]), catchAsync(async (req: Request, res: Response) => {
   const { isPublished, isFeatured } = req.body;
