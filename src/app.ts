@@ -30,7 +30,8 @@ import { newsletterRouter } from "./module/newsletter/newsletter.route";
 import { paymentRouter } from "./module/payment/payment.route";
 import { contactRouter } from "./module/contact/contact.route";
 import { globalErrorHandler } from "./middleware/globalErrorHandler";
-import { dashboardRouter }   from "./module/dashboard/dashboard.route";
+import { dashboardRouter }    from "./module/dashboard/dashboard.route";
+import { chatbotRouter }     from "./module/chatbot/chatbot.route";
 
 
 const app: Application = express();
@@ -79,6 +80,7 @@ app.use(
 // ─── Core Routes ────────────────────────────────────────────────────────────
 app.use("/api/auth", authRouter);
 app.use("/api/dashboard", dashboardRouter);
+app.use("/api/chatbot",   chatbotRouter);
 app.use("/api/seller",    sellerRouter);
 app.use("/api/orders",    orderRouter);
 app.use("/api/admin",     adminRouter);
