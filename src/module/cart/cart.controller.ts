@@ -7,8 +7,8 @@ const addToCartController = async (
   next: NextFunction
 ) => {
   try {
-    const { medicineId, quantity } = req.body;
-    console.log(medicineId,quantity)
+    const { medicineId, quantity, priceOverride } = req.body;
+
 
     if (!medicineId) {
       return res.status(400).json({
@@ -17,10 +17,14 @@ const addToCartController = async (
       });
     }
 
-    // Assuming req.user.id is set from auth middleware
     const userId = req.user.id;
 
-    const cartItem = await cartService.addToCartService(userId, medicineId, quantity || 1);
+    const cartItem = await cartService.addToCartService(
+      userId,
+      medicineId,
+      quantity || 1,
+      priceOverride ?? null    // ← flash-sale price or null
+    );
 
     return res.status(200).json({
       success: true,

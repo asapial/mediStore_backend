@@ -23,8 +23,6 @@ const getMyMedicines = async (req: Request, res: Response, next: NextFunction) =
     // Pass query parameters as filters to service
     const medicines = await medicineService.getMyMedicines(userId as string);
 
-    console.log(userId)
-    console.log(medicines);
 
     res.status(200).json({
       success: true,

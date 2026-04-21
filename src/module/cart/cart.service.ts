@@ -4,10 +4,11 @@ import { prisma } from "../../lib/prisma";
 const addToCartService = async (
   userId: string,
   medicineId: string,
-  quantity: number = 1
+  quantity: number = 1,
+  priceOverride?: number | null
 ): Promise<CartItem> => {
 
-    console.log(userId,medicineId,quantity)
+
   // 1️⃣ Find or create a cart for the user
   let cart = await prisma.cart.findUnique({ where: { userId } });
 
@@ -17,27 +18,34 @@ const addToCartService = async (
     });
   }
 
-  // 2️⃣ Upsert cart item (increment if exists)
-  const cartItem = await prisma.cartItem.upsert({
-    where: {
-      cartId_medicineId: {
-        cartId: cart.id,
-        medicineId,
-      },
-    },
-    update: {
-      quantity: {
-        increment: quantity,
-      },
-    },
-    create: {
-      cartId: cart.id,
-      medicineId,
-      quantity,
-    },
+  // 2️⃣ Check if item already in cart
+  const existing = await prisma.cartItem.findUnique({
+    where: { cartId_medicineId: { cartId: cart.id, medicineId } },
   });
 
-  console.log(cartItem)
+  let cartItem: CartItem;
+  if (existing) {
+    // If already in cart, increment quantity but keep the most recent priceOverride
+    cartItem = await prisma.cartItem.update({
+      where: { id: existing.id },
+      data: {
+        quantity: { increment: quantity },
+        // Only update priceOverride if a new one is explicitly provided
+        ...(priceOverride != null ? { priceOverride } : {}),
+      },
+    });
+  } else {
+    cartItem = await prisma.cartItem.create({
+      data: {
+        cartId: cart.id,
+        medicineId,
+        quantity,
+        priceOverride: priceOverride ?? null,
+      },
+    });
+  }
+
+
   return cartItem;
 };
 
@@ -120,7 +128,7 @@ const updateCartItemService = async (
     include: { medicine: true },
   });
 
-  console.log(updated)
+
 
   return updated;
 };

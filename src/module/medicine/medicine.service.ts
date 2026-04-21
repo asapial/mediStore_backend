@@ -69,7 +69,7 @@ const getMyMedicines = async (sellerId:string) => {
 
   });
 
-  console.log(medicines)
+
 
   return medicines;
 };

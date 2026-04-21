@@ -5,7 +5,6 @@ import { string, z, ZodError } from "zod";
 
 const postMedicineQuery = async (data: postMedicineType, sellerId: string) => {
     try {
-        console.log(sellerId)
         // 1️⃣ Validate input using Zod
         const validatedData = postMedicineSchema.parse(data);
 
@@ -18,7 +17,10 @@ const postMedicineQuery = async (data: postMedicineType, sellerId: string) => {
 
         // 3️⃣ Insert into DB
         const result = await prisma.medicine.create({
-            data: prismaData,
+            data: {
+              ...prismaData,
+              discountPrice: validatedData.discountPrice ?? null,
+            },
         });
 
         return result;
@@ -44,10 +46,11 @@ const updateMedicineQuery = async (id: string, data: updateMedicineType) => {
         if (data.name !== undefined) prismaData.name = { set: data.name };
         if (data.description !== undefined) prismaData.description = { set: data.description };
         if (data.price !== undefined) prismaData.price = { set: data.price };
+        if (data.discountPrice !== undefined) prismaData.discountPrice = { set: data.discountPrice };
         if (data.stock !== undefined) prismaData.stock = { set: data.stock };
         if (data.manufacturer !== undefined) prismaData.manufacturer = { set: data.manufacturer };
-        if (data.category !== undefined) prismaData.category = { set: data.category };
-
+        if (data.categoryId !== undefined) prismaData.categoryId = { set: data.categoryId };
+        if (data.requiresPrescription !== undefined) prismaData.requiresPrescription = { set: data.requiresPrescription };
         // Special case for image: can be null
         if (data.image !== undefined) prismaData.image = { set: data.image };
 

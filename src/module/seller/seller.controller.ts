@@ -14,7 +14,7 @@ const postMedicine = async (
 
     const sellerId= req.user.id;
 
-    console.log(sellerId)
+
 
     const result = await sellerService.postMedicineQuery(data,sellerId as string);
 
@@ -110,7 +110,7 @@ const getSellerOrder = async (
 
 
   const sellerId = req.user.id;
-  console.log(sellerId)
+
 
   try {
 
@@ -167,7 +167,7 @@ const updateOrderItemStatus = async (
   try {
     const { orderId, orderItemIds, status } = req.body;
 
-    console.log(orderId, orderItemIds,status)
+ 
 
     // 🧪 Basic validation
     if (!orderId || !Array.isArray(orderItemIds) || orderItemIds.length === 0) {

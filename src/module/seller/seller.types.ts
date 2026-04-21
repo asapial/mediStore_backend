@@ -6,6 +6,7 @@ export const postMedicineSchema = z.object({
   description: z.string().min(5, "Description must be at least 5 characters"),
   image: z.string().url("Invalid image URL").nullable().optional(),
   price: z.number().positive("Price must be greater than 0"),
+  discountPrice: z.number().positive().nullable().optional(),
   stock: z.number().int().nonnegative("Stock must be 0 or more"),
   manufacturer: z.string().min(2, "Manufacturer must be at least 2 characters"),
   categoryId: z.string().min(1, "Category ID is required"),
@@ -17,9 +18,12 @@ export const updateMedicineSchema = z.object({
   description: z.string().min(5).optional(),
   image: z.string().url().nullable().optional(),
   price: z.number().positive().optional(),
+  discountPrice: z.number().positive().nullable().optional(),
   stock: z.number().int().nonnegative().optional(),
   manufacturer: z.string().min(2).optional(),
-  category: z.array(z.string().min(1)).optional(), // optional array
+  categoryId: z.string().min(1).optional(),
+  requiresPrescription: z.boolean().optional(),
+  category: z.array(z.string().min(1)).optional(),
 });
 
 export type updateMedicineType = z.infer<typeof updateMedicineSchema>;

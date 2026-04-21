@@ -22,8 +22,7 @@ const auth = (allowedRoles?: ("CUSTOMER" | "SELLER" | "ADMIN")[]) => {
                 headers: req.headers as any,
             });
 
-            console.log("Headers ",req.headers);
-            console.log("Session ",session);
+
 
             // ❌ Not logged in
             if (!session || !session.user) {

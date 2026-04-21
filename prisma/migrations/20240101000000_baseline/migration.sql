@@ -1,0 +1,2 @@
+-- Baseline migration: DB was already in sync via prisma db push.
+-- This file intentionally left empty.

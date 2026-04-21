@@ -5,7 +5,7 @@ import {
   init_enums,
   init_prisma,
   prisma
-} from "./chunk-3JEITQP7.mjs";
+} from "./chunk-QMMVNLXO.mjs";
 
 // src/lib/auth.ts
 import { betterAuth } from "better-auth";
@@ -90,6 +90,7 @@ var init_seller_types = __esm({
       description: z.string().min(5, "Description must be at least 5 characters"),
       image: z.string().url("Invalid image URL").nullable().optional(),
       price: z.number().positive("Price must be greater than 0"),
+      discountPrice: z.number().positive().nullable().optional(),
       stock: z.number().int().nonnegative("Stock must be 0 or more"),
       manufacturer: z.string().min(2, "Manufacturer must be at least 2 characters"),
       categoryId: z.string().min(1, "Category ID is required")
@@ -99,10 +100,12 @@ var init_seller_types = __esm({
       description: z.string().min(5).optional(),
       image: z.string().url().nullable().optional(),
       price: z.number().positive().optional(),
+      discountPrice: z.number().positive().nullable().optional(),
       stock: z.number().int().nonnegative().optional(),
       manufacturer: z.string().min(2).optional(),
+      categoryId: z.string().min(1).optional(),
+      requiresPrescription: z.boolean().optional(),
       category: z.array(z.string().min(1)).optional()
-      // optional array
     });
   }
 });
@@ -126,7 +129,10 @@ var init_seller_service = __esm({
           // Prisma expects string | null
         };
         const result = await prisma.medicine.create({
-          data: prismaData
+          data: {
+            ...prismaData,
+            discountPrice: validatedData.discountPrice ?? null
+          }
         });
         return result;
       } catch (err) {
@@ -143,9 +149,11 @@ var init_seller_service = __esm({
         if (data.name !== void 0) prismaData.name = { set: data.name };
         if (data.description !== void 0) prismaData.description = { set: data.description };
         if (data.price !== void 0) prismaData.price = { set: data.price };
+        if (data.discountPrice !== void 0) prismaData.discountPrice = { set: data.discountPrice };
         if (data.stock !== void 0) prismaData.stock = { set: data.stock };
         if (data.manufacturer !== void 0) prismaData.manufacturer = { set: data.manufacturer };
-        if (data.category !== void 0) prismaData.category = { set: data.category };
+        if (data.categoryId !== void 0) prismaData.categoryId = { set: data.categoryId };
+        if (data.requiresPrescription !== void 0) prismaData.requiresPrescription = { set: data.requiresPrescription };
         if (data.image !== void 0) prismaData.image = { set: data.image };
         const result = await prisma.medicine.update({
           where: { id },
@@ -1258,9 +1266,9 @@ var init_admin_controller = __esm({
     toggleCategoryFeatured = async (req, res) => {
       try {
         const { id } = req.params;
-        const cat = await (await import("./prisma-SMDP3ZJ7.mjs")).prisma.category.findUnique({ where: { id } });
+        const cat = await (await import("./prisma-7A2BDF5Q.mjs")).prisma.category.findUnique({ where: { id } });
         if (!cat) return res.status(404).json({ status: false, message: "Category not found" });
-        const updated = await (await import("./prisma-SMDP3ZJ7.mjs")).prisma.category.update({
+        const updated = await (await import("./prisma-7A2BDF5Q.mjs")).prisma.category.update({
           where: { id },
           data: { isFeatured: !cat.isFeatured }
         });
@@ -1273,7 +1281,7 @@ var init_admin_controller = __esm({
       try {
         const { id } = req.params;
         const { icon, color, name } = req.body;
-        const updated = await (await import("./prisma-SMDP3ZJ7.mjs")).prisma.category.update({
+        const updated = await (await import("./prisma-7A2BDF5Q.mjs")).prisma.category.update({
           where: { id },
           data: { ...icon ? { icon } : {}, ...color ? { color } : {}, ...name ? { name } : {} }
         });
@@ -3806,6 +3814,40 @@ var init_blog_route = __esm({
       });
       sendResponse(res, { status: status25.CREATED, success: true, message: "Blog submitted for review", data: blog });
     }));
+    router22.put("/:id", auth_middleware_default(), catchAsync(async (req, res) => {
+      const { id } = req.params;
+      const { title, summary, content, image, tags } = req.body;
+      const existing = await prisma.blog.findUnique({ where: { id } });
+      if (!existing) {
+        return sendResponse(res, { status: status25.NOT_FOUND, success: false, message: "Blog not found", data: null });
+      }
+      if (existing.userId !== req.user.id && req.user.role !== "ADMIN") {
+        return sendResponse(res, { status: status25.FORBIDDEN, success: false, message: "Not authorized to edit this blog", data: null });
+      }
+      const shouldReset = req.user.role !== "ADMIN";
+      let slug = existing.slug;
+      if (title && title.trim() !== existing.title) {
+        const baseSlug = makeSlug(title.trim());
+        slug = baseSlug;
+        let i = 1;
+        while (await prisma.blog.findFirst({ where: { slug, NOT: { id } } })) {
+          slug = `${baseSlug}-${i++}`;
+        }
+      }
+      const blog = await prisma.blog.update({
+        where: { id },
+        data: {
+          ...title ? { title: title.trim(), slug } : {},
+          ...summary ? { summary: summary.trim() } : {},
+          ...content ? { content: content.trim() } : {},
+          image: image !== void 0 ? image || null : existing.image,
+          tags: Array.isArray(tags) ? tags : tags ? [tags] : existing.tags,
+          ...shouldReset ? { isPublished: false, isFeatured: false, publishedAt: null } : {}
+        },
+        include: { author: { select: { id: true, name: true, image: true } } }
+      });
+      sendResponse(res, { status: status25.OK, success: true, message: shouldReset ? "Blog updated \u2014 pending admin review" : "Blog updated", data: blog });
+    }));
     router22.patch("/admin/:id", auth_middleware_default(["ADMIN"]), catchAsync(async (req, res) => {
       const { isPublished, isFeatured } = req.body;
       const blog = await prisma.blog.update({
@@ -4614,14 +4656,13 @@ Customer-specific instructions:
   }
   return base;
 }
-var OPENROUTER_URL, MODEL, PLACEHOLDER, PLATFORM_KNOWLEDGE, chatWithAI, guestChat, chatbotService;
+var OPENROUTER_URL, MODEL, PLATFORM_KNOWLEDGE, chatWithAI, guestChat, chatbotService;
 var init_chatbot_service = __esm({
   "src/module/chatbot/chatbot.service.ts"() {
     "use strict";
     init_prisma();
     OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
     MODEL = "google/gemma-3-4b-it:free";
-    PLACEHOLDER = "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";
     PLATFORM_KNOWLEDGE = `
 \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 LIFELINE HEALTHCARE PLATFORM \u2014 COMPLETE KNOWLEDGE BASE
@@ -4736,7 +4777,7 @@ Assistant:`;
     };
     guestChat = async (message, history) => {
       const key = process.env.OPENROUTER_API_KEY ?? "";
-      if (!key || key === PLACEHOLDER) {
+      if (!key) {
         throw new Error("AI service is not yet configured. Please add a valid OPENROUTER_API_KEY to the backend .env file.");
       }
       const trimmedHistory = history.slice(-4);
