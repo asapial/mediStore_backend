@@ -5,11 +5,15 @@ export const createOrderSchema = z.object({
   items: z
     .array(
       z.object({
-        medicineId: z.string().min(1, "Medicine ID is required"),
-        quantity: z.number().int().positive("Quantity must be at least 1"),
+        medicineId:    z.string().min(1, "Medicine ID is required"),
+        quantity:      z.number().int().positive("Quantity must be at least 1"),
+        priceOverride: z.number().positive().optional().nullable(), // flash-sale price per unit
+        flashQuantity: z.number().int().min(0).optional().default(0), // units at flash price
       })
     )
     .min(1, "At least one order item is required"),
+  couponCode: z.string().optional(),
 });
 
 export type CreateOrderType = z.infer<typeof createOrderSchema>;
+

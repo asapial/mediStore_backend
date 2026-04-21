@@ -293,7 +293,8 @@ model CartItem {
   cartId        String
   medicineId    String
   quantity      Int      @default(1)
-  priceOverride Float?   // flash-sale or special priced items store the locked-in price here
+  priceOverride Float?   // flash-sale locked-in price per unit (null = regular price)
+  flashQuantity Int      @default(0) // how many of `quantity` units are at the flash-sale price
   addedAt       DateTime @default(now())
 
   cart     Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)

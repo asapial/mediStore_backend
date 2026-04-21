@@ -36,7 +36,13 @@ import { chatbotRouter }     from "./module/chatbot/chatbot.route";
 
 const app: Application = express();
 app.use(cookieParser());
-app.use(express.json());
+
+// Skip express.json() for multipart/form-data so multer can read the stream
+app.use((req, res, next) => {
+  if (req.headers["content-type"]?.startsWith("multipart/form-data")) return next();
+  express.json()(req, res, next);
+});
+app.use(express.urlencoded({ extended: true }));
 
 
 // ✅ CORS setup (must be FIRST)

@@ -9,38 +9,91 @@ const postOrderQuery = async (
 
         // 1️⃣ Fetch medicines
         const medicineIds = data.items.map((i) => i.medicineId);
-
         const medicines = await tx.medicine.findMany({
             where: { id: { in: medicineIds } },
         });
-
         if (medicines.length !== medicineIds.length) {
             throw new Error("One or more medicines not found");
         }
 
-        // 2️⃣ Create order
+        // 2️⃣ Validate stock and build price snapshots
+        for (const item of data.items) {
+            const medicine = medicines.find((m) => m.id === item.medicineId)!;
+            if (item.quantity > medicine.stock) {
+                throw new Error(
+                    `Insufficient stock for "${medicine.name}". Available: ${medicine.stock}, Requested: ${item.quantity}`
+                );
+            }
+        }
+
+        // 3️⃣ Create order
         const order = await tx.order.create({
-            data: {
-                userId,
-                address: data.address,
-            },
+            data: { userId, address: data.address },
         });
 
-        // 3️⃣ Create order items
+        // 4️⃣ Create order items with correct price snapshot
+        //    flashQty units → priceOverride (flash price)
+        //    remaining units → medicine.price (regular price)
+        //    stored price = weighted average snapshot for the row
         const orderItemsData = data.items.map((item) => {
-            const medicine = medicines.find((m) => m.id === item.medicineId)!;
+            const medicine  = medicines.find((m) => m.id === item.medicineId)!;
+            const flashQty  = item.flashQuantity ?? 0;
+            const regularQty = item.quantity - flashQty;
+            const flashPrice = (flashQty > 0 && item.priceOverride != null)
+                ? item.priceOverride
+                : medicine.price;
+
+            // Weighted average price per unit (used for revenue tracking)
+            const priceSnapshot =
+                (flashQty * flashPrice + regularQty * medicine.price) / item.quantity;
 
             return {
-                orderId: order.id,
+                orderId:    order.id,
                 medicineId: medicine.id,
-                quantity: item.quantity,
-                price: medicine.price, // price snapshot
+                quantity:   item.quantity,
+                price:      priceSnapshot,
             };
         });
 
-        await tx.orderItem.createMany({
-            data: orderItemsData,
-        });
+        await tx.orderItem.createMany({ data: orderItemsData });
+
+        // 5️⃣ Decrement medicine stock for each ordered item
+        await Promise.all(
+            data.items.map((item) =>
+                tx.medicine.update({
+                    where: { id: item.medicineId },
+                    data:  { stock: { decrement: item.quantity } },
+                })
+            )
+        );
+
+        // 6️⃣ Increment flashSale.soldCount for items that used flash pricing
+        const flashItems = data.items.filter(
+            (item) => (item.flashQuantity ?? 0) > 0 && item.priceOverride != null
+        );
+        if (flashItems.length > 0) {
+            const now = new Date();
+            await Promise.all(
+                flashItems.map(async (item) => {
+                    // Find the active flash sale for this medicine at this price
+                    const flashSale = await tx.flashSale.findFirst({
+                        where: {
+                            medicineId:    item.medicineId,
+                            discountPrice: item.priceOverride!,
+                            isApproved:    true,
+                            startAt:       { lte: now },
+                            endAt:         { gte: now },
+                        },
+                    });
+                    if (flashSale) {
+                        await tx.flashSale.update({
+                            where: { id: flashSale.id },
+                            data:  { soldCount: { increment: item.flashQuantity! } },
+                        });
+                    }
+                })
+            );
+        }
 
         return order;
     });

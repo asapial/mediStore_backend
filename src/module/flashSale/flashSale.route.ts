@@ -38,6 +38,15 @@ router.get("/my", auth(["SELLER"]), catchAsync(async (req: Request, res: Respons
 
 // POST /api/flash-sales — seller creates
 router.post("/", auth(["SELLER"]), catchAsync(async (req: Request, res: Response) => {
+  // ── Guard: seller must have a VERIFIED license ──────────────────────────────
+  const license = await prisma.sellerLicense.findUnique({ where: { sellerId: req.user.id } });
+  if (!license || license.status !== "VERIFIED") {
+    throw new AppError(
+      status.FORBIDDEN,
+      "Your seller license must be approved (VERIFIED) by an admin before you can create flash sales."
+    );
+  }
+
   const { medicineId, discountPrice, saleStock, startAt, endAt } = req.body;
   if (!medicineId || !discountPrice || !saleStock || !startAt || !endAt)
     throw new AppError(status.BAD_REQUEST, "medicineId, discountPrice, saleStock, startAt, endAt required");
@@ -45,6 +54,22 @@ router.post("/", auth(["SELLER"]), catchAsync(async (req: Request, res: Response
   const medicine = await prisma.medicine.findUnique({ where: { id: medicineId } });
   if (!medicine) throw new AppError(status.NOT_FOUND, "Medicine not found");
   if (medicine.sellerId !== req.user.id) throw new AppError(status.FORBIDDEN, "Not your medicine");
+
+  // ── Guard: saleStock must not exceed the medicine's total stock ─────────────
+  if (Number(saleStock) > medicine.stock) {
+    throw new AppError(
+      status.BAD_REQUEST,
+      `Flash sale stock (${saleStock}) cannot exceed the medicine's total available stock (${medicine.stock}).`
+    );
+  }
+
+  // ── Guard: discountPrice must be less than originalPrice ────────────────────
+  if (Number(discountPrice) >= medicine.price) {
+    throw new AppError(
+      status.BAD_REQUEST,
+      `Discount price (${discountPrice}) must be lower than the original price (${medicine.price}).`
+    );
+  }
 
   const sale = await prisma.flashSale.create({
     data: {

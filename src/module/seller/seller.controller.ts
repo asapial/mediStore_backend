@@ -1,8 +1,9 @@
 import { Request, Response, NextFunction } from "express";
 import { postMedicineType, updateMedicineType } from "./seller.types";
 import { sellerService } from "./seller.service";
-import { string, ZodError } from "zod";
+import { ZodError } from "zod";
 import { OrderStatus } from "../../../generated/prisma/enums";
+import { prisma } from "../../lib/prisma";
 
 const postMedicine = async (
   req: Request,
@@ -10,20 +11,26 @@ const postMedicine = async (
   next: NextFunction
 ) => {
   try {
+    const sellerId = req.user.id;
+
+    // ── Guard: seller must have a VERIFIED license ──────────────────────────
+    const license = await prisma.sellerLicense.findUnique({ where: { sellerId } });
+    if (!license || license.status !== "VERIFIED") {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Your seller license must be approved (VERIFIED) by an admin before you can add medicines.",
+      });
+    }
+
     const data: postMedicineType = req.body;
-
-    const sellerId= req.user.id;
-
-
-
-    const result = await sellerService.postMedicineQuery(data,sellerId as string);
+    const result = await sellerService.postMedicineQuery(data, sellerId as string);
 
     res.status(201).json({
       message: "Medicine Added Successfully",
       data: result,
     });
   } catch (error: unknown) {
-    // Handle Zod validation errors
     if (error instanceof ZodError) {
       return res.status(400).json({
         message: "Validation failed",
@@ -33,11 +40,9 @@ const postMedicine = async (
         })),
       });
     }
-
-    // Handle other errors
     console.error("Error from controller:", error);
     return res.status(500).json({
-      message: "Internal server error1",
+      message: "Internal server error",
       error: (error as Error).message || "Unknown error",
     });
   }
