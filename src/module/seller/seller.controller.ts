@@ -221,11 +221,31 @@ const updateOrderItemStatus = async (
     next(error);
   }
 };
+const getInventory = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const sellerId = req.user?.id;
+    if (!sellerId) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    const inventory = await sellerService.getInventoryQuery(sellerId);
+
+    res.status(200).json({
+      success: true,
+      message: "Inventory fetched successfully",
+      data: inventory,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const sellerController = {
   postMedicine,
   updateMedicine,
   deleteMedicine,
   getSellerOrder,
   sellerStatController,
-  updateOrderItemStatus
+  updateOrderItemStatus,
+  getInventory
 };

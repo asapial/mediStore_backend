@@ -20,6 +20,16 @@ router.post("/", catchAsync(async (req: Request, res: Response) => {
   sendResponse(res, { status: status.CREATED, success: true, message: "Message sent successfully", data: msg });
 }));
 
+// GET /api/contact/my — authenticated customer views own tickets
+router.get("/my", auth(["CUSTOMER"]), catchAsync(async (req: Request, res: Response) => {
+  const email = req.user.email;
+  const messages = await prisma.contactMessage.findMany({
+    where: { email },
+    orderBy: { createdAt: "desc" },
+  });
+  sendResponse(res, { status: status.OK, success: true, message: "Your tickets fetched", data: messages });
+}));
+
 // ── ADMIN ─────────────────────────────────────────────────────────────────────
 
 // GET /api/contact/admin/messages

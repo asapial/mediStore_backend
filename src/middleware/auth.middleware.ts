@@ -11,7 +11,7 @@ declare global {
     }
 }
 
-const auth = (allowedRoles?: ("CUSTOMER" | "SELLER" | "ADMIN")[]) => {
+const auth = (allowedRoles?: ("CUSTOMER" | "SELLER" | "ADMIN" | "WAREHOUSE")[]) => {
     return async (
         req: express.Request,
         res: express.Response,

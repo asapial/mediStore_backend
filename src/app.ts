@@ -32,6 +32,16 @@ import { contactRouter } from "./module/contact/contact.route";
 import { globalErrorHandler } from "./middleware/globalErrorHandler";
 import { dashboardRouter }    from "./module/dashboard/dashboard.route";
 import { chatbotRouter }     from "./module/chatbot/chatbot.route";
+// ─── Warehouse Management System ────────────────────────────────────────────
+import { warehouseRouter }          from "./module/warehouse/warehouse.route";
+import { stockTransferRouter }      from "./module/stockTransfer/stockTransfer.route";
+import { grnRouter }                from "./module/grn/grn.route";
+import { fulfillmentRouter }        from "./module/fulfillment/fulfillment.route";
+import { expiryAlertRouter }        from "./module/expiryAlert/expiryAlert.route";
+import { storageBinRouter }         from "./module/storageBin/storageBin.route";
+import { supplierRouter }           from "./module/supplier/supplier.route";
+import { temperatureLogRouter }     from "./module/temperatureLog/temperatureLog.route";
+import { warehouseAnalyticsRouter } from "./module/warehouseAnalytics/warehouseAnalytics.route";
 
 
 const app: Application = express();
@@ -118,6 +128,17 @@ app.use("/api/testimonials", testimonialRouter);
 app.use("/api/newsletter", newsletterRouter);
 app.use("/api/payments",          paymentRouter);
 app.use("/api/contact",           contactRouter);
+
+// ─── Feature Set 4: Warehouse Management System ───────────────────────────────
+app.use("/api/warehouses",           warehouseRouter);
+app.use("/api/stock-transfers",      stockTransferRouter);
+app.use("/api/grn",                  grnRouter);
+app.use("/api/fulfillment",          fulfillmentRouter);
+app.use("/api/expiry-alerts",        expiryAlertRouter);
+app.use("/api/storage-bins",         storageBinRouter);
+app.use("/api/suppliers",            supplierRouter);
+app.use("/api/temperature-logs",     temperatureLogRouter);
+app.use("/api/warehouse-analytics",  warehouseAnalyticsRouter);
 
 // Better Auth middleware
 app.all("/api/auth/*splat", toNodeHandler(auth));

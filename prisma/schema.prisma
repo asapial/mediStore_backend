@@ -17,6 +17,7 @@ enum Role {
   CUSTOMER
   SELLER
   ADMIN
+  WAREHOUSE
 }
 
 enum OrderStatus {
@@ -120,6 +121,16 @@ model User {
   blogs                Blog[]              @relation("UserBlogs")
   testimonials         Testimonial[]       @relation("UserTestimonials")
 
+  // Warehouse relations
+  managedWarehouses    Warehouse[]         @relation("WarehouseManager")
+  transferRequests     StockTransfer[]     @relation("TransferRequests")
+  grnReceived          GoodsReceiptNote[]  @relation("GRNReceiver")
+  fulfillmentTasks     FulfillmentTask[]   @relation("FulfillmentWorker")
+  temperatureLogs      TemperatureLog[]    @relation("TempLogger")
+
+  // Seller withdrawal requests
+  sellerWithdrawals    WithdrawalRequest[] @relation("SellerWithdrawals")
+
   @@map("user")
 }
 
@@ -157,6 +168,12 @@ model Medicine {
   subscriptions Subscription[]
   wishlistItems WishlistItem[]
   flashSales    FlashSale[]
+  // Warehouse
+  locationStocks    LocationStock[]
+  binAllocations    BinAllocation[]
+  transferItems     StockTransferItem[]
+  grnItems          GRNItem[]
+  expiryAlerts      ExpiryAlert[]
 }
 
 model MedicineBatch {
@@ -198,6 +215,7 @@ model Order {
   subOrders     SubOrder[]
   tracking      OrderTracking[]
   returnRequest ReturnRequest?
+  fulfillmentTask FulfillmentTask?
 }
 
 model OrderItem {
@@ -613,4 +631,335 @@ model ContactMessage {
   updatedAt  DateTime @updatedAt
 
   @@map("contact_message")
+}
+
+// ─── Warehouse Management System ─────────────────────────────────────
+
+enum TransferStatus {
+  PENDING
+  IN_TRANSIT
+  COMPLETED
+  CANCELLED
+}
+
+enum GRNStatus {
+  DRAFT
+  SUBMITTED
+  VERIFIED
+}
+
+enum FulfillmentStatus {
+  PENDING
+  PICKED
+  PACKED
+  DISPATCHED
+  DELIVERED
+}
+
+enum ShipmentStatus {
+  EXPECTED
+  RECEIVED
+  PARTIAL
+  CANCELLED
+}
+
+enum AlertSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+// 1. Warehouse Profile
+model Warehouse {
+  id          String   @id @default(cuid())
+  name        String
+  address     String
+  city        String
+  country     String   @default("Bangladesh")
+  lat         Float
+  lng         Float
+  managerId   String
+  phone       String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  manager          User                @relation("WarehouseManager", fields: [managerId], references: [id])
+  locations        WarehouseLocation[]
+  locationStocks   LocationStock[]
+  transfersFrom    StockTransfer[]     @relation("TransferFrom")
+  transfersTo      StockTransfer[]     @relation("TransferTo")
+  grns             GoodsReceiptNote[]
+  fulfillmentTasks FulfillmentTask[]
+  expiryAlerts     ExpiryAlert[]
+  storageBins      StorageBin[]
+  shipments        SupplierShipment[]
+  temperatureLogs  TemperatureLog[]
+
+  @@map("warehouse")
+}
+
+// 2. Warehouse Zones / Aisles / Shelves
+model WarehouseLocation {
+  id          String   @id @default(cuid())
+  warehouseId String
+  zone        String   // e.g. "A", "COLD", "CONTROLLED"
+  aisle       String
+  shelf       String
+  description String?
+  createdAt   DateTime @default(now())
+
+  warehouse Warehouse    @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  bins      StorageBin[]
+
+  @@unique([warehouseId, zone, aisle, shelf])
+  @@map("warehouse_location")
+}
+
+// 3. Per-warehouse medicine stock
+model LocationStock {
+  id          String   @id @default(cuid())
+  warehouseId String
+  medicineId  String
+  quantity    Int      @default(0)
+  updatedAt   DateTime @updatedAt
+
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  medicine  Medicine  @relation(fields: [medicineId], references: [id])
+
+  @@unique([warehouseId, medicineId])
+  @@map("location_stock")
+}
+
+// 4. Physical storage bins
+model StorageBin {
+  id          String   @id @default(cuid())
+  warehouseId String
+  locationId  String
+  binCode     String
+  capacity    Int
+  currentLoad Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  warehouse   Warehouse         @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  location    WarehouseLocation @relation(fields: [locationId], references: [id])
+  allocations BinAllocation[]
+
+  @@unique([warehouseId, binCode])
+  @@map("storage_bin")
+}
+
+// 5. Medicine → bin allocation
+model BinAllocation {
+  id         String   @id @default(cuid())
+  binId      String
+  medicineId String
+  quantity   Int
+  allocatedAt DateTime @default(now())
+
+  bin      StorageBin @relation(fields: [binId], references: [id], onDelete: Cascade)
+  medicine Medicine   @relation(fields: [medicineId], references: [id])
+
+  @@unique([binId, medicineId])
+  @@map("bin_allocation")
+}
+
+// 6. Inter-warehouse stock transfer
+model StockTransfer {
+  id              String         @id @default(cuid())
+  fromWarehouseId String
+  toWarehouseId   String
+  requestedById   String
+  status          TransferStatus @default(PENDING)
+  notes           String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  fromWarehouse Warehouse          @relation("TransferFrom", fields: [fromWarehouseId], references: [id])
+  toWarehouse   Warehouse          @relation("TransferTo",   fields: [toWarehouseId],   references: [id])
+  requestedBy   User               @relation("TransferRequests", fields: [requestedById], references: [id])
+  items         StockTransferItem[]
+
+  @@map("stock_transfer")
+}
+
+model StockTransferItem {
+  id         String   @id @default(cuid())
+  transferId String
+  medicineId String
+  quantity   Int
+
+  transfer StockTransfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
+  medicine Medicine      @relation(fields: [medicineId], references: [id])
+
+  @@map("stock_transfer_item")
+}
+
+// 7. Goods Receipt Note (GRN)
+model GoodsReceiptNote {
+  id          String    @id @default(cuid())
+  warehouseId String
+  supplierId  String
+  shipmentId  String?
+  receivedById String
+  status      GRNStatus @default(DRAFT)
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  warehouse  Warehouse        @relation(fields: [warehouseId], references: [id])
+  supplier   Supplier         @relation(fields: [supplierId], references: [id])
+  shipment   SupplierShipment? @relation(fields: [shipmentId], references: [id])
+  receivedBy User             @relation("GRNReceiver", fields: [receivedById], references: [id])
+  items      GRNItem[]
+
+  @@map("goods_receipt_note")
+}
+
+model GRNItem {
+  id          String   @id @default(cuid())
+  grnId       String
+  medicineId  String
+  expectedQty Int
+  receivedQty Int
+  batchNumber String?
+  expiryDate  DateTime?
+
+  grn      GoodsReceiptNote @relation(fields: [grnId], references: [id], onDelete: Cascade)
+  medicine Medicine         @relation(fields: [medicineId], references: [id])
+
+  @@map("grn_item")
+}
+
+// 8. Order fulfillment task
+model FulfillmentTask {
+  id          String            @id @default(cuid())
+  orderId     String            @unique
+  warehouseId String
+  assignedToId String?
+  status      FulfillmentStatus @default(PENDING)
+  startedAt   DateTime?
+  packedAt    DateTime?
+  dispatchedAt DateTime?
+  createdAt   DateTime          @default(now())
+
+  order       Order        @relation(fields: [orderId], references: [id])
+  warehouse   Warehouse    @relation(fields: [warehouseId], references: [id])
+  assignedTo  User?        @relation("FulfillmentWorker", fields: [assignedToId], references: [id])
+  packingSlip PackingSlip?
+
+  @@map("fulfillment_task")
+}
+
+model PackingSlip {
+  id                String   @id @default(cuid())
+  fulfillmentTaskId String   @unique
+  packedBy          String
+  items             Json     // [{medicineId, name, qty, binCode}]
+  createdAt         DateTime @default(now())
+
+  fulfillmentTask FulfillmentTask @relation(fields: [fulfillmentTaskId], references: [id])
+
+  @@map("packing_slip")
+}
+
+// 9. Expiry monitoring
+model ExpiryAlert {
+  id          String        @id @default(cuid())
+  warehouseId String
+  medicineId  String
+  batchNumber String
+  expiresAt   DateTime
+  daysLeft    Int
+  severity    AlertSeverity
+  isResolved  Boolean       @default(false)
+  createdAt   DateTime      @default(now())
+
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  medicine  Medicine  @relation(fields: [medicineId], references: [id])
+
+  @@map("expiry_alert")
+}
+
+// 10. Supplier
+model Supplier {
+  id        String   @id @default(cuid())
+  name      String
+  contact   String?
+  email     String?
+  phone     String?
+  address   String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  shipments SupplierShipment[]
+  grns      GoodsReceiptNote[]
+
+  @@map("supplier")
+}
+
+// 11. Supplier inbound shipment
+model SupplierShipment {
+  id          String         @id @default(cuid())
+  supplierId  String
+  warehouseId String
+  status      ShipmentStatus @default(EXPECTED)
+  expectedAt  DateTime
+  receivedAt  DateTime?
+  trackingNum String?
+  notes       String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  supplier  Supplier           @relation(fields: [supplierId], references: [id])
+  warehouse Warehouse          @relation(fields: [warehouseId], references: [id])
+  grns      GoodsReceiptNote[]
+
+  @@map("supplier_shipment")
+}
+
+// 12. Cold chain temperature logging
+model TemperatureLog {
+  id          String   @id @default(cuid())
+  warehouseId String
+  zone        String
+  temperature Float    // Celsius
+  minAllowed  Float    @default(2.0)
+  maxAllowed  Float    @default(8.0)
+  isAlert     Boolean  @default(false)
+  recordedById String?
+  recordedAt  DateTime @default(now())
+
+  warehouse  Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  recordedBy User?     @relation("TempLogger", fields: [recordedById], references: [id])
+
+  @@map("temperature_log")
+}
+
+// 13. Seller Withdrawal Requests
+enum WithdrawalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model WithdrawalRequest {
+  id          String           @id @default(cuid())
+  sellerId    String
+  amount      Float
+  status      WithdrawalStatus @default(PENDING)
+  bankName    String
+  accountNumber String
+  branchName  String?
+  adminNote   String?
+  processedAt DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  seller User @relation("SellerWithdrawals", fields: [sellerId], references: [id])
+
+  @@map("withdrawal_request")
 }

@@ -2,6 +2,7 @@ import { OrderStatus } from "../../../generated/prisma/enums";
 import { prisma } from "../../lib/prisma";
 import { postMedicineType, postMedicineSchema, updateMedicineType } from "./seller.types";
 import { string, z, ZodError } from "zod";
+import { ensureFulfillmentTask } from "../subOrder/subOrder.service";
 
 const postMedicineQuery = async (data: postMedicineType, sellerId: string) => {
     try {
@@ -93,43 +94,43 @@ const getSellerOrderQuery = async (id: string) => {
             user: { select: { name: true, email: true } },
             items: {
                 select: {
-                    id: true,
-                    orderId: true,
-                    medicineId: true,
-                    quantity: true,
-                    price: true,
-                    status: true,
-                    medicine: {
-                        select: {
-                            sellerId: true,
-                            name: true,
-                            image: true,
+                    id: true, orderId: true, medicineId: true,
+                    quantity: true, price: true, status: true,
+                    subOrderId: true,
+                    medicine: { select: { sellerId: true, name: true, image: true } },
+                }
+            },
+            // Include SubOrders so the frontend knows which flow to use
+            subOrders: {
+                where: { sellerId: id },
+                include: {
+                    items: {
+                        include: {
+                            medicine: { select: { id: true, name: true, image: true, price: true } }
                         }
                     }
                 }
-            }
-        }
+            },
+        },
+        orderBy: { createdAt: "desc" },
     });
 
     const filteredOrders = orders.flatMap(order => {
-        const items = order.items.filter(
-            item => item.medicine?.sellerId === id
-        );
-
-        if (!items.length) return []; // ❌ order removed completely
+        const items = order.items.filter(item => item.medicine?.sellerId === id);
+        if (!items.length) return [];
 
         return [{
-            id: order.id,
-            status: order.status,
-            address: order.address,
-            createdAt: order.createdAt,
-            user: { name: (order as any).user?.name ?? "—", email: (order as any).user?.email ?? "—" },
+            id:         order.id,
+            status:     order.status,
+            address:    order.address,
+            createdAt:  order.createdAt,
+            user:       { name: (order as any).user?.name ?? "—", email: (order as any).user?.email ?? "—" },
             items,
+            subOrders:  (order as any).subOrders ?? [],
         }];
     });
 
     return filteredOrders;
-
 }
 
 
@@ -303,34 +304,35 @@ const updateOrderItemStatusQuery = async (
         data: { status },
     });
 
-    // If moving to SHIPPED → decrement medicine stock
-    if (status === "SHIPPED") {
-        const items = await prisma.orderItem.findMany({
-            where: { id: { in: orderItemsList } },
-            select: { medicineId: true, quantity: true },
-        });
-        await Promise.all(
-            items.map(item =>
-                prisma.medicine.update({
-                    where: { id: item.medicineId },
-                    data: { stock: { decrement: item.quantity } },
-                })
-            )
-        );
-    }
-
-    // If all items share the same status → promote the parent order too
+    // If all items in the order share the same status → promote the parent order
     const remaining = await prisma.orderItem.count({
         where: { orderId, status: { not: status } },
     });
     if (remaining === 0) {
-        await prisma.order.update({
-            where: { id: orderId },
-            data: { status },
-        });
+        await prisma.order.update({ where: { id: orderId }, data: { status } });
+
+        // ── When all items are SHIPPED → auto-create FulfillmentTask ────────────
+        // Covers orders placed BEFORE the SubOrder refactor (no SubOrder records)
+        if (status === "SHIPPED") {
+            await ensureFulfillmentTask(orderId);
+        }
     }
 
     return { success: true };
+};
+
+
+
+const getInventoryQuery = async (sellerId: string) => {
+    return await prisma.medicine.findMany({
+        where: { sellerId },
+        include: {
+            batches: true,
+            stockAlert: true,
+            expiryAlerts: true
+        },
+        orderBy: { createdAt: 'desc' }
+    });
 };
 
 
@@ -341,5 +343,6 @@ export const sellerService = {
     deleteMedicineQuery,
     getSellerOrderQuery,
     getSellerStats,
-    updateOrderItemStatusQuery
+    updateOrderItemStatusQuery,
+    getInventoryQuery
 };

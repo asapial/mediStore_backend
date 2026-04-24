@@ -31,31 +31,38 @@ const postOrderQuery = async (
             data: { userId, address: data.address },
         });
 
-        // 4️⃣ Create order items with correct price snapshot
-        //    flashQty units → priceOverride (flash price)
-        //    remaining units → medicine.price (regular price)
-        //    stored price = weighted average snapshot for the row
-        const orderItemsData = data.items.map((item) => {
-            const medicine  = medicines.find((m) => m.id === item.medicineId)!;
-            const flashQty  = item.flashQuantity ?? 0;
-            const regularQty = item.quantity - flashQty;
-            const flashPrice = (flashQty > 0 && item.priceOverride != null)
-                ? item.priceOverride
-                : medicine.price;
+        // 4️⃣ Create sub-orders per seller
+        const sellerItems = data.items.reduce((acc, item) => {
+            const medicine = medicines.find((m) => m.id === item.medicineId)!;
+            if (!acc[medicine.sellerId]) acc[medicine.sellerId] = [];
+            acc[medicine.sellerId].push({ ...item, medicine });
+            return acc;
+        }, {} as Record<string, (typeof data.items[0] & { medicine: any })[]>);
 
-            // Weighted average price per unit (used for revenue tracking)
-            const priceSnapshot =
-                (flashQty * flashPrice + regularQty * medicine.price) / item.quantity;
+        for (const sellerId in sellerItems) {
+            // Build price snapshots first so we can compute the total
+            const itemRows = sellerItems[sellerId].map((item) => {
+                const flashQty   = item.flashQuantity ?? 0;
+                const regularQty = item.quantity - flashQty;
+                const flashPrice = (flashQty > 0 && item.priceOverride != null)
+                    ? item.priceOverride : item.medicine.price;
+                const priceSnapshot =
+                    (flashQty * flashPrice + regularQty * item.medicine.price) / item.quantity;
+                return { medicineId: item.medicineId, quantity: item.quantity, price: priceSnapshot };
+            });
 
-            return {
-                orderId:    order.id,
-                medicineId: medicine.id,
-                quantity:   item.quantity,
-                price:      priceSnapshot,
-            };
-        });
+            const subTotal = itemRows.reduce((s, r) => s + r.price * r.quantity, 0);
 
-        await tx.orderItem.createMany({ data: orderItemsData });
+            // Create SubOrder with correct total (used for wallet credit on delivery)
+            const subOrder = await tx.subOrder.create({
+                data: { orderId: order.id, sellerId, total: subTotal, status: "PLACED" },
+            });
+
+            // Create OrderItems linked to this SubOrder
+            await tx.orderItem.createMany({
+                data: itemRows.map((r) => ({ ...r, orderId: order.id, subOrderId: subOrder.id })),
+            });
+        }
 
         // 5️⃣ Decrement medicine stock for each ordered item
         await Promise.all(
@@ -75,7 +82,6 @@ const postOrderQuery = async (
             const now = new Date();
             await Promise.all(
                 flashItems.map(async (item) => {
-                    // Find the active flash sale for this medicine at this price
                     const flashSale = await tx.flashSale.findFirst({
                         where: {
                             medicineId:    item.medicineId,
@@ -100,29 +106,29 @@ const postOrderQuery = async (
 };
 
 const getUserOrdersQuery = async (userId: string) => {
-
-    const result = await prisma.order.findMany({
-        where: {
-            userId
-        },
+    return prisma.order.findMany({
+        where: { userId },
         include: {
             items: {
                 include: {
                     medicine: {
-                        select: {
-                            name: true,
-                            description: true,
-                            price: true,
-                            image: true,
-                            sellerId: true
+                        select: { name: true, description: true, price: true, image: true, sellerId: true }
+                    }
+                }
+            },
+            subOrders: {
+                include: {
+                    seller: { select: { id: true, name: true, email: true } },
+                    items: {
+                        include: {
+                            medicine: { select: { id: true, name: true, price: true, image: true } }
                         }
                     }
                 }
-            }
-        }
-    })
-
-    return result;
+            },
+        },
+        orderBy: { createdAt: "desc" },
+    });
 }
 
 const getOrderDetailsQuery = async (orderId: string) => {

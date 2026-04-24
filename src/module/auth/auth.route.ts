@@ -7,9 +7,9 @@ const router = Router();
 
 router.post("/register", authController.registerController);
 router.post("/login", authController.loginController);
-router.get("/me",auth([ "CUSTOMER" ,"SELLER" , "ADMIN"]), authController.meController);
+router.get("/me", auth(["CUSTOMER", "SELLER", "ADMIN", "WAREHOUSE"]), authController.meController);
 // router.patch("/update", auth(['ADMIN']), authController.updateProfileController);
-router.patch("/update", auth([ "CUSTOMER" ,"SELLER" , "ADMIN"]), authController.updateProfileController);
+router.patch("/update", auth(["CUSTOMER", "SELLER", "ADMIN", "WAREHOUSE"]), authController.updateProfileController);
 
 
 

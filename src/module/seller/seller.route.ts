@@ -12,7 +12,7 @@ router.delete("/medicines/:id",auth([ "SELLER"]), sellerController.deleteMedicin
 router.get("/orders",auth([ "SELLER"]),sellerController.getSellerOrder)
 router.get("/stat", auth(), sellerController.sellerStatController);
 router.put("/orders",auth([ "SELLER"]),sellerController.updateOrderItemStatus);
-
+router.get("/inventory", auth(["SELLER"]), sellerController.getInventory);
 
 
 // POST	/api/seller/medicines	Add medicine
