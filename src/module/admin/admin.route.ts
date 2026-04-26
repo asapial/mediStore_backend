@@ -5,8 +5,12 @@ import auth from "../../middleware/auth.middleware";
 const router = Router();
 
 
-router.get("/users",auth([ "ADMIN"]),adminController.getAllUsers);
-router.get("/users/:id",adminController.getUserDetails);
+router.get("/users", auth(["ADMIN"]), adminController.getAllUsers);
+
+// ⚠️ Must be BEFORE /users/:id to avoid route shadowing
+router.get("/users/search", auth(["ADMIN"]), adminController.searchUsers);
+
+router.get("/users/:id", adminController.getUserDetails);
 router.get("/categories",adminController.getAllCategory);
 router.post("/categories",auth([ "ADMIN"]), adminController.createCategory);
 router.delete("/categories/:id",auth([ "ADMIN"]), adminController.deleteCategory);

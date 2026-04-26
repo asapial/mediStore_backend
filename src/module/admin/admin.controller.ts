@@ -320,6 +320,25 @@ const updateCategoryMeta = async (req: Request, res: Response) => {
   }
 };
 
+const searchUsers = async (req: Request, res: Response) => {
+  try {
+    const email = (req.query.email as string || "").trim();
+    if (!email || email.length < 2) {
+      return res.status(200).json({ status: true, data: [] });
+    }
+    const { prisma } = await import("../../lib/prisma");
+    const users = await prisma.user.findMany({
+      where: { email: { contains: email, mode: "insensitive" } },
+      select: { id: true, name: true, email: true, image: true, role: true },
+      take: 8,
+      orderBy: { email: "asc" },
+    });
+    return res.status(200).json({ status: true, data: users });
+  } catch (error) {
+    return res.status(500).json({ status: false, message: "Search failed", error });
+  }
+};
+
 export const adminController = {
     getAllUsers,
     getAllCategory,
@@ -334,4 +353,5 @@ export const adminController = {
     deleteCategory,
     toggleCategoryFeatured,
     updateCategoryMeta,
+    searchUsers,
 }

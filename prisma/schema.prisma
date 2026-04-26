@@ -131,6 +131,10 @@ model User {
   // Seller withdrawal requests
   sellerWithdrawals    WithdrawalRequest[] @relation("SellerWithdrawals")
 
+  // Warehouse location change requests
+  locationRequestsMade     WarehouseLocationRequest[] @relation("LocationRequester")
+  locationRequestsReviewed WarehouseLocationRequest[] @relation("LocationReviewer")
+
   @@map("user")
 }
 
@@ -696,8 +700,39 @@ model Warehouse {
   storageBins      StorageBin[]
   shipments        SupplierShipment[]
   temperatureLogs  TemperatureLog[]
+  locationRequests WarehouseLocationRequest[]
 
   @@map("warehouse")
+}
+
+// Warehouse location change requests (submitted by WAREHOUSE, approved by ADMIN)
+enum LocationRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model WarehouseLocationRequest {
+  id            String                @id @default(cuid())
+  warehouseId   String
+  address       String?
+  city          String?
+  lat           Float?
+  lng           Float?
+  phone         String?
+  note          String?
+  status        LocationRequestStatus @default(PENDING)
+  adminNote     String?
+  requestedById String
+  reviewedById  String?
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+
+  warehouse   Warehouse @relation(fields: [warehouseId],   references: [id], onDelete: Cascade)
+  requestedBy User      @relation("LocationRequester",     fields: [requestedById], references: [id])
+  reviewedBy  User?     @relation("LocationReviewer",      fields: [reviewedById],  references: [id])
+
+  @@map("warehouse_location_request")
 }
 
 // 2. Warehouse Zones / Aisles / Shelves

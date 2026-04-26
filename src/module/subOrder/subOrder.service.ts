@@ -2,25 +2,67 @@ import { prisma } from "../../lib/prisma";
 import AppError from "../../errorHelpers/AppError";
 import status from "http-status";
 
-// ─── Helper: get or create a default warehouse ───────────────────────────────
-// Ensures FulfillmentTask creation never fails due to missing warehouse
-async function getOrCreateDefaultWarehouse() {
-  // 1. Try active warehouse first
-  let warehouse = await prisma.warehouse.findFirst({
+// ─── Haversine distance (km) ─────────────────────────────────────────────────
+function haversine(lat1: number, lng1: number, lat2: number, lng2: number) {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// ─── Geocode a free-text address via OpenStreetMap Nominatim ─────────────────
+async function geocodeAddress(address: string): Promise<{ lat: number; lng: number } | null> {
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1&countrycodes=bd`;
+    const res  = await fetch(url, {
+      headers: { "User-Agent": "MediStore/1.0 (warehouse-auto-assign)" },
+    });
+    if (!res.ok) return null;
+    const data = await res.json() as Array<{ lat: string; lon: string }>;
+    if (!data.length) return null;
+    return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+  } catch {
+    return null;
+  }
+}
+
+// ─── Pick nearest warehouse to a delivery address ────────────────────────────
+async function getNearestWarehouseToAddress(deliveryAddress: string) {
+  const warehouses = await prisma.warehouse.findMany({
     where: { isActive: true },
     orderBy: { createdAt: "asc" },
   });
-  // 2. Fall back to ANY warehouse
-  if (!warehouse) {
-    warehouse = await prisma.warehouse.findFirst({ orderBy: { createdAt: "asc" } });
-  }
-  // 3. Auto-create a default warehouse so the flow never silently breaks
-  if (!warehouse) {
-    warehouse = await prisma.warehouse.create({
-      data: { name: "Main Warehouse", isActive: true },
+
+  if (!warehouses.length) {
+    // Auto-create a placeholder so the flow never silently breaks
+    return prisma.warehouse.create({
+      data: { name: "Main Warehouse", address: "Dhaka", city: "Dhaka", lat: 23.8103, lng: 90.4125, managerId: (await prisma.user.findFirst({ where: { role: "WAREHOUSE" } }))!.id },
     });
   }
-  return warehouse;
+
+  // Try geocoding — if it fails, just pick the first active warehouse
+  const coords = await geocodeAddress(deliveryAddress);
+  if (!coords) {
+    console.warn(`[warehouse-assign] Geocoding failed for "${deliveryAddress}" — using first active warehouse`);
+    return warehouses[0];
+  }
+
+  // Pick warehouse with minimum Haversine distance to the customer
+  let nearest = warehouses[0];
+  let minDist  = haversine(coords.lat, coords.lng, nearest.lat, nearest.lng);
+
+  for (const wh of warehouses.slice(1)) {
+    const dist = haversine(coords.lat, coords.lng, wh.lat, wh.lng);
+    if (dist < minDist) { minDist = dist; nearest = wh; }
+  }
+
+  console.info(`[warehouse-assign] "${deliveryAddress}" → nearest: ${nearest.name} (${nearest.city}) — ${minDist.toFixed(1)} km away`);
+  return nearest;
 }
 
 // ─── Shared: create FulfillmentTask for an order (idempotent) ────────────────
@@ -28,7 +70,11 @@ export async function ensureFulfillmentTask(orderId: string) {
   const existing = await prisma.fulfillmentTask.findUnique({ where: { orderId } });
   if (existing) return existing;
 
-  const warehouse = await getOrCreateDefaultWarehouse();
+  // Fetch the order's delivery address to find the nearest warehouse
+  const order = await prisma.order.findUnique({ where: { id: orderId }, select: { address: true } });
+  const deliveryAddress = order?.address ?? "";
+
+  const warehouse = await getNearestWarehouseToAddress(deliveryAddress);
 
   const task = await prisma.fulfillmentTask.create({
     data: { orderId, warehouseId: warehouse.id, status: "PENDING" },

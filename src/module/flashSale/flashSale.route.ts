@@ -84,6 +84,17 @@ router.post("/", auth(["SELLER"]), catchAsync(async (req: Request, res: Response
   sendResponse(res, { status: status.CREATED, success: true, message: "Flash sale submitted for approval", data: sale });
 }));
 
+// DELETE /api/flash-sales/admin/:id — admin removes any flash sale
+// ⚠️ Must be declared BEFORE DELETE /:id, otherwise Express matches /admin/:id
+//    with the /:id wildcard first (id = "admin") and the auth(["SELLER"]) guard
+//    rejects the admin before this handler is ever reached.
+router.delete("/admin/:id", auth(["ADMIN"]), catchAsync(async (req: Request, res: Response) => {
+  const sale = await prisma.flashSale.findUnique({ where: { id: req.params.id } });
+  if (!sale) throw new AppError(status.NOT_FOUND, "Flash sale not found");
+  await prisma.flashSale.delete({ where: { id: req.params.id } });
+  sendResponse(res, { status: status.OK, success: true, message: "Flash sale removed", data: null });
+}));
+
 // DELETE /api/flash-sales/:id — seller cancels pending
 router.delete("/:id", auth(["SELLER"]), catchAsync(async (req: Request, res: Response) => {
   const sale = await prisma.flashSale.findUnique({ where: { id: req.params.id } });
@@ -117,5 +128,6 @@ router.patch("/admin/:id", auth(["ADMIN"]), catchAsync(async (req: Request, res:
   });
   sendResponse(res, { status: status.OK, success: true, message: `Flash sale ${isApproved ? "approved" : "rejected"}`, data: sale });
 }));
+
 
 export const flashSaleRouter = router;

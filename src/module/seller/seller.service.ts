@@ -111,6 +111,18 @@ const getSellerOrderQuery = async (id: string) => {
                     }
                 }
             },
+            // Include FulfillmentTask + Warehouse so seller knows where to ship
+            fulfillmentTask: {
+                include: {
+                    warehouse: {
+                        select: {
+                            id: true, name: true, address: true, city: true,
+                            country: true, phone: true,
+                            manager: { select: { name: true, email: true } },
+                        }
+                    }
+                }
+            },
         },
         orderBy: { createdAt: "desc" },
     });
@@ -120,13 +132,14 @@ const getSellerOrderQuery = async (id: string) => {
         if (!items.length) return [];
 
         return [{
-            id:         order.id,
-            status:     order.status,
-            address:    order.address,
-            createdAt:  order.createdAt,
-            user:       { name: (order as any).user?.name ?? "—", email: (order as any).user?.email ?? "—" },
+            id:              order.id,
+            status:          order.status,
+            address:         order.address,
+            createdAt:       order.createdAt,
+            user:            { name: (order as any).user?.name ?? "—", email: (order as any).user?.email ?? "—" },
             items,
-            subOrders:  (order as any).subOrders ?? [],
+            subOrders:       (order as any).subOrders ?? [],
+            fulfillmentTask: (order as any).fulfillmentTask ?? null,
         }];
     });
 

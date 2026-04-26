@@ -30,7 +30,14 @@ const getMyQueue = async (_userId: string) => {
         include: {
           items:     { include: { medicine: { select: { id: true, name: true, image: true } } } },
           user:      { select: { id: true, name: true, email: true } },
-          subOrders: { include: { seller: { select: { id: true, name: true } } } },
+          subOrders: {
+            include: {
+              seller: { select: { id: true, name: true } },
+              // Include items so frontend can compute correct seller totals
+              // (subOrder.total may be 0 for legacy orders)
+              items:  { select: { price: true, quantity: true } },
+            },
+          },
         },
       },
       warehouse:   { select: { id: true, name: true } },
@@ -159,7 +166,17 @@ const dispatchTask = async (taskId: string) => {
 const markDelivered = async (taskId: string) => {
   const task = await prisma.fulfillmentTask.findUnique({
     where: { id: taskId },
-    include: { order: { include: { subOrders: true } } },
+    include: {
+      order: {
+        include: {
+          // Include items so we can compute per-seller totals accurately
+          // (subOrder.total may be 0 for legacy orders)
+          subOrders: {
+            include: { items: { select: { price: true, quantity: true } } },
+          },
+        },
+      },
+    },
   });
 
   if (!task) throw new AppError(status.NOT_FOUND, "Task not found");
@@ -188,17 +205,27 @@ const markDelivered = async (taskId: string) => {
 
     // ── 3. Credit each seller's wallet ───────────────────────────────────────
     for (const subOrder of task.order.subOrders) {
-      if (subOrder.total <= 0) continue;
-      let wallet = await tx.wallet.findUnique({ where: { userId: subOrder.sellerId } });
-      if (!wallet) wallet = await tx.wallet.create({ data: { userId: subOrder.sellerId, balance: 0 } });
+      // Compute from actual items (works for new orders with subOrderId set)
+      // Fall back to subOrder.total for legacy orders where items may not be linked
+      const fromItems = subOrder.items.reduce((s, i) => s + i.price * i.quantity, 0);
+      const computedTotal = fromItems > 0 ? fromItems : subOrder.total;
+      if (computedTotal <= 0) continue;
 
-      await tx.wallet.update({ where: { id: wallet.id }, data: { balance: { increment: subOrder.total } } });
+      let wallet = await tx.wallet.findUnique({ where: { userId: subOrder.sellerId } });
+      if (!wallet) {
+        wallet = await tx.wallet.create({ data: { userId: subOrder.sellerId, balance: 0 } });
+      }
+
+      await tx.wallet.update({
+        where: { id: wallet.id },
+        data:  { balance: { increment: computedTotal } },
+      });
       await tx.walletTransaction.create({
         data: {
           walletId:    wallet.id,
-          amount:      subOrder.total,
+          amount:      computedTotal,
           type:        TransactionType.DEPOSIT,
-          description: `Order #${task.orderId.slice(-8).toUpperCase()} delivered — ৳${subOrder.total.toFixed(2)} credited`,
+          description: `Order #${task.orderId.slice(-8).toUpperCase()} delivered — ৳${computedTotal.toFixed(2)} credited`,
         },
       });
     }

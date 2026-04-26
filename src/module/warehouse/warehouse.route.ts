@@ -11,9 +11,18 @@ const router = Router();
 // ── Warehouse CRUD ──────────────────────────────────────────────────
 router.post("/",    auth(["ADMIN"]),               warehouseController.createWarehouse);
 router.get("/",     auth(["ADMIN", "WAREHOUSE"]),  warehouseController.listWarehouses);
-router.get("/nearest",                             warehouseController.getNearestWarehouses); // public
+router.get("/nearest",                             warehouseController.getNearestWarehouses);
 router.get("/:id",  auth(["ADMIN", "WAREHOUSE"]), warehouseController.getWarehouse);
 router.patch("/:id", auth(["ADMIN"]),              warehouseController.updateWarehouse);
+router.delete("/:id", auth(["ADMIN"]),             warehouseController.deleteWarehouse);
+
+// ── Location Change Requests ─────────────────────────────────────────
+// WAREHOUSE: submit a change request for their warehouse location
+router.post("/:id/location-request", auth(["WAREHOUSE"]), warehouseController.submitLocationRequest);
+// ADMIN: list all requests (optionally ?status=PENDING)
+router.get("/location-requests/all", auth(["ADMIN"]),     warehouseController.listLocationRequests);
+// ADMIN: approve or reject a specific request
+router.patch("/location-requests/:reqId/review", auth(["ADMIN"]), warehouseController.reviewLocationRequest);
 
 // ── Locations ───────────────────────────────────────────────────────
 router.post("/locations/add", auth(["ADMIN", "WAREHOUSE"]), warehouseController.addLocation);

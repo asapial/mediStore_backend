@@ -154,7 +154,11 @@ router.get("/document", auth(["SELLER", "ADMIN"]), async (req: Request, res: Res
 
       res.setHeader("Content-Type", contentType);
       res.setHeader("Content-Disposition", "inline; filename=\"license.pdf\"");
-      res.setHeader("Cache-Control", "private, max-age=3600");
+      // No caching — seller may resubmit a new document at any time;
+      // we must always stream the latest version from Cloudinary.
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("Expires", "0");
 
       upstream.pipe(res);
     }).on("error", (err) => {
