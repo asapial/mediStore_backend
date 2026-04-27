@@ -1,37 +1,9 @@
 import { prisma } from "../../lib/prisma";
 import AppError from "../../errorHelpers/AppError";
 import status from "http-status";
+import { extractCoordsFromBDAddress, haversineKm } from "../../utils/bdGeo";
 
-// ─── Haversine distance (km) ─────────────────────────────────────────────────
-function haversine(lat1: number, lng1: number, lat2: number, lng2: number) {
-  const R = 6371;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLng = ((lng2 - lng1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLng / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-// ─── Geocode a free-text address via OpenStreetMap Nominatim ─────────────────
-async function geocodeAddress(address: string): Promise<{ lat: number; lng: number } | null> {
-  try {
-    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1&countrycodes=bd`;
-    const res  = await fetch(url, {
-      headers: { "User-Agent": "MediStore/1.0 (warehouse-auto-assign)" },
-    });
-    if (!res.ok) return null;
-    const data = await res.json() as Array<{ lat: string; lon: string }>;
-    if (!data.length) return null;
-    return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
-  } catch {
-    return null;
-  }
-}
-
-// ─── Pick nearest warehouse to a delivery address ────────────────────────────
+// ─── Pick nearest active warehouse to a Bangladesh delivery address ───────────
 async function getNearestWarehouseToAddress(deliveryAddress: string) {
   const warehouses = await prisma.warehouse.findMany({
     where: { isActive: true },
@@ -39,29 +11,25 @@ async function getNearestWarehouseToAddress(deliveryAddress: string) {
   });
 
   if (!warehouses.length) {
-    // Auto-create a placeholder so the flow never silently breaks
-    return prisma.warehouse.create({
-      data: { name: "Main Warehouse", address: "Dhaka", city: "Dhaka", lat: 23.8103, lng: 90.4125, managerId: (await prisma.user.findFirst({ where: { role: "WAREHOUSE" } }))!.id },
-    });
+    throw new AppError(status.SERVICE_UNAVAILABLE, "No active warehouse available. Contact admin.");
   }
 
-  // Try geocoding — if it fails, just pick the first active warehouse
-  const coords = await geocodeAddress(deliveryAddress);
+  if (warehouses.length === 1) return warehouses[0]!;
+
+  const coords = extractCoordsFromBDAddress(deliveryAddress);
   if (!coords) {
-    console.warn(`[warehouse-assign] Geocoding failed for "${deliveryAddress}" — using first active warehouse`);
-    return warehouses[0];
+    console.warn(`[warehouse-assign] Could not resolve coords for: "${deliveryAddress}" — assigning ${warehouses[0]!.name}`);
+    return warehouses[0]!;
   }
 
-  // Pick warehouse with minimum Haversine distance to the customer
-  let nearest = warehouses[0];
-  let minDist  = haversine(coords.lat, coords.lng, nearest.lat, nearest.lng);
+  const nearest = warehouses.reduce((best, wh) => {
+    const distBest = haversineKm(coords.lat, coords.lng, best.lat, best.lng);
+    const distWh   = haversineKm(coords.lat, coords.lng, wh.lat,   wh.lng);
+    return distWh < distBest ? wh : best;
+  });
 
-  for (const wh of warehouses.slice(1)) {
-    const dist = haversine(coords.lat, coords.lng, wh.lat, wh.lng);
-    if (dist < minDist) { minDist = dist; nearest = wh; }
-  }
-
-  console.info(`[warehouse-assign] "${deliveryAddress}" → nearest: ${nearest.name} (${nearest.city}) — ${minDist.toFixed(1)} km away`);
+  const finalDist = haversineKm(coords.lat, coords.lng, nearest.lat, nearest.lng);
+  console.info(`[warehouse-assign] "${deliveryAddress}" → ${nearest.name} (${nearest.city}) — ${finalDist.toFixed(1)} km`);
   return nearest;
 }
 
@@ -70,17 +38,29 @@ export async function ensureFulfillmentTask(orderId: string) {
   const existing = await prisma.fulfillmentTask.findUnique({ where: { orderId } });
   if (existing) return existing;
 
-  // Fetch the order's delivery address to find the nearest warehouse
-  const order = await prisma.order.findUnique({ where: { id: orderId }, select: { address: true } });
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: { address: true },
+  });
   const deliveryAddress = order?.address ?? "";
-
   const warehouse = await getNearestWarehouseToAddress(deliveryAddress);
 
   const task = await prisma.fulfillmentTask.create({
     data: { orderId, warehouseId: warehouse.id, status: "PENDING" },
   });
 
-  await prisma.order.update({ where: { id: orderId }, data: { status: "PROCESSING" } });
+  // Only update order to PROCESSING if still in initial state (prevent regression from SHIPPED→PROCESSING)
+  await prisma.order.updateMany({
+    where: { id: orderId, status: { in: ["PLACED", "CONFIRMED"] } },
+    data:  { status: "PROCESSING" },
+  });
+  await prisma.orderTracking.create({
+    data: {
+      orderId,
+      status: "CONFIRMED",
+      note:   `Order is being processed at ${warehouse.name} (${warehouse.city}). Packages are being consolidated.`,
+    },
+  });
 
   return task;
 }
@@ -99,6 +79,13 @@ const getSellerSubOrders = async (sellerId: string) => {
       items: {
         include: {
           medicine: { select: { id: true, name: true, price: true, image: true } },
+        },
+      },
+      shipmentLeg: {
+        select: {
+          id: true, status: true,
+          originWarehouse: { select: { id: true, name: true, city: true } },
+          destWarehouse:   { select: { id: true, name: true, city: true } },
         },
       },
     },
@@ -120,11 +107,19 @@ const getOrderSubOrders = async (orderId: string, userId: string) => {
           medicine: { select: { id: true, name: true, price: true, image: true } },
         },
       },
+      shipmentLeg: {
+        select: {
+          id: true, status: true,
+          arrivedAtOriginAt: true, dispatchedAt: true, arrivedAtDestAt: true,
+          originWarehouse: { select: { id: true, name: true, city: true } },
+          destWarehouse:   { select: { id: true, name: true, city: true } },
+        },
+      },
     },
   });
 };
 
-// ─── Update sub-order status (seller) ────────────────────────────────────────
+// ─── Update sub-order status (seller action) ──────────────────────────────────
 const updateSubOrderStatus = async (id: string, sellerId: string, orderStatus: string) => {
   const sub = await prisma.subOrder.findFirst({ where: { id, sellerId } });
   if (!sub) throw new AppError(status.NOT_FOUND, "Sub-order not found");
@@ -134,17 +129,19 @@ const updateSubOrderStatus = async (id: string, sellerId: string, orderStatus: s
     data: { status: orderStatus as any },
   });
 
-  // ── When seller marks SHIPPED: check if ALL sub-orders for this order are SHIPPED ──
+  // ── When seller marks SHIPPED: update ShipmentLeg + check all-shipped ───────
   if (orderStatus === "SHIPPED") {
-    const allSubOrders = await prisma.subOrder.findMany({ where: { orderId: sub.orderId } });
+    // Advance this SubOrder's ShipmentLeg so the origin WH can receive the items
+    await prisma.shipmentLeg.updateMany({
+      where: { subOrderId: id, status: "SELLER_PREPARING" },
+      data:  { status: "AWAITING_ORIGIN_WH" },
+    });
 
-    // Treat current sub-order as already updated
-    const allShipped = allSubOrders.every((s) => (s.id === id ? true : s.status === "SHIPPED"));
-
-    if (allShipped) {
-      // ensureFulfillmentTask auto-creates a warehouse if none exists
-      await ensureFulfillmentTask(sub.orderId);
-    }
+    // ✅ Always call ensureFulfillmentTask on EVERY seller-ship (idempotent).
+    // Previously this only fired when ALL sellers had shipped, causing the task
+    // to never appear until the last seller acted. The warehouse routing flow
+    // (receiveAtDest) also calls this — the upsert guard prevents duplicates.
+    await ensureFulfillmentTask(sub.orderId);
   }
 
   return updated;

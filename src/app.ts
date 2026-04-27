@@ -42,6 +42,8 @@ import { storageBinRouter }         from "./module/storageBin/storageBin.route";
 import { supplierRouter }           from "./module/supplier/supplier.route";
 import { temperatureLogRouter }     from "./module/temperatureLog/temperatureLog.route";
 import { warehouseAnalyticsRouter } from "./module/warehouseAnalytics/warehouseAnalytics.route";
+import { shipmentLegRouter }       from "./module/shipmentLeg/shipmentLeg.route";
+import { profileRouter }           from "./module/profile/profile.route";
 
 
 const app: Application = express();
@@ -139,6 +141,9 @@ app.use("/api/storage-bins",         storageBinRouter);
 app.use("/api/suppliers",            supplierRouter);
 app.use("/api/temperature-logs",     temperatureLogRouter);
 app.use("/api/warehouse-analytics",  warehouseAnalyticsRouter);
+app.use("/api/shipment-legs",        shipmentLegRouter);
+// ─── Feature Set 5: User Profiles ────────────────────────────────────────────
+app.use("/api/profile",              profileRouter);
 
 // Better Auth middleware
 app.all("/api/auth/*splat", toNodeHandler(auth));

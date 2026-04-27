@@ -49,7 +49,7 @@ const createWarehouse = async (data: {
 // showAll=false → default:    returns only active warehouses
 const listWarehouses = (showAll = false) =>
   prisma.warehouse.findMany({
-    where: showAll ? undefined : { isActive: true },
+    ...(showAll ? {} : { where: { isActive: true } }),
     include: { manager: { select: { id: true, name: true, email: true } }, _count: { select: { locationStocks: true, fulfillmentTasks: true } } },
     orderBy: { name: "asc" },
   });
@@ -133,7 +133,7 @@ const submitLocationRequest = async (
 
 const listLocationRequests = (filterStatus?: string) =>
   prisma.warehouseLocationRequest.findMany({
-    where: filterStatus ? { status: filterStatus as any } : undefined,
+    ...(filterStatus ? { where: { status: filterStatus as any } } : {}),
     include: {
       warehouse:   { select: { id: true, name: true, city: true } },
       requestedBy: { select: { id: true, name: true, email: true } },
@@ -158,7 +158,11 @@ const reviewLocationRequest = async (
     // 1. Mark request as approved/rejected
     const updated = await tx.warehouseLocationRequest.update({
       where: { id: reqId },
-      data:  { status: action, reviewedById: reviewerId, adminNote },
+      data:  {
+        status: action,
+        reviewedById: reviewerId,
+        ...(adminNote !== undefined ? { adminNote } : {}),
+      },
     });
 
     // 2. If approved, apply the changes to the actual warehouse
@@ -179,8 +183,57 @@ const reviewLocationRequest = async (
   });
 };
 
+// ─── Get warehouse managed by the current user (WAREHOUSE role) ──────────────
+const getMyWarehouse = async (userId: string) => {
+  const wh = await prisma.warehouse.findFirst({
+    where: { managerId: userId },
+    include: {
+      manager: { select: { id: true, name: true, email: true } },
+      locationStocks: {
+        include: {
+          medicine: { select: { id: true, name: true, price: true, image: true, stock: true, genericName: true } },
+        },
+        orderBy: { medicine: { name: "asc" } },
+      },
+      _count: { select: { locationStocks: true, fulfillmentTasks: true } },
+    },
+  });
+  if (!wh) throw new AppError(status.NOT_FOUND, "No warehouse found for this manager");
+  return wh;
+};
+
+// ─── Get inbound shipment legs for a warehouse as DESTINATION ─────────────────
+// Returns all legs where destWarehouseId = warehouseId, with per-seller item details.
+// Used by the warehouse Inbound Orders panel.
+const getInboundOrders = (warehouseId: string) =>
+  prisma.shipmentLeg.findMany({
+    where: { destWarehouseId: warehouseId },
+    include: {
+      subOrder: {
+        include: {
+          seller: { select: { id: true, name: true, email: true, businessCity: true } },
+          items: {
+            include: {
+              medicine: { select: { id: true, name: true, price: true, image: true } },
+            },
+          },
+        },
+      },
+      order: {
+        select: {
+          id: true, address: true, createdAt: true, status: true,
+          user: { select: { name: true, email: true } },
+        },
+      },
+      originWarehouse: { select: { id: true, name: true, city: true, address: true, phone: true } },
+      destWarehouse:   { select: { id: true, name: true, city: true, address: true } },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
 export const warehouseService = {
   createWarehouse, listWarehouses, getWarehouse, updateWarehouse,
   deleteWarehouse, getNearestWarehouses, addLocation, listLocations,
   submitLocationRequest, listLocationRequests, reviewLocationRequest,
+  getMyWarehouse, getInboundOrders,
 };

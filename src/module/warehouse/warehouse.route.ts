@@ -10,6 +10,8 @@ const router = Router();
 
 // ── Warehouse CRUD ──────────────────────────────────────────────────
 router.post("/",    auth(["ADMIN"]),               warehouseController.createWarehouse);
+// /my must be declared BEFORE /:id so Express does not treat "my" as an id param
+router.get("/my",   auth(["WAREHOUSE", "ADMIN"]),  warehouseController.getMyWarehouse);
 router.get("/",     auth(["ADMIN", "WAREHOUSE"]),  warehouseController.listWarehouses);
 router.get("/nearest",                             warehouseController.getNearestWarehouses);
 router.get("/:id",  auth(["ADMIN", "WAREHOUSE"]), warehouseController.getWarehouse);
@@ -27,6 +29,9 @@ router.patch("/location-requests/:reqId/review", auth(["ADMIN"]), warehouseContr
 // ── Locations ───────────────────────────────────────────────────────
 router.post("/locations/add", auth(["ADMIN", "WAREHOUSE"]), warehouseController.addLocation);
 router.get("/:warehouseId/locations", auth(["ADMIN", "WAREHOUSE"]), warehouseController.listLocations);
+
+// ── Inbound Orders (as destination WH) ─────────────────────────────
+router.get("/:warehouseId/inbound-orders", auth(["ADMIN", "WAREHOUSE"]), warehouseController.getInboundOrders);
 
 // ── Location Stock ──────────────────────────────────────────────────
 router.get("/:warehouseId/stock", auth(["ADMIN", "WAREHOUSE"]),

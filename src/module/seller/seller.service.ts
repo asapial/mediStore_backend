@@ -108,10 +108,26 @@ const getSellerOrderQuery = async (id: string) => {
                         include: {
                             medicine: { select: { id: true, name: true, image: true, price: true } }
                         }
-                    }
+                    },
+                    // Origin warehouse = where seller should physically ship their items
+                    originWarehouse: {
+                        select: {
+                            id: true, name: true, address: true,
+                            city: true, country: true, phone: true,
+                            manager: { select: { name: true, email: true } },
+                        }
+                    },
+                    // ShipmentLeg for real-time tracking status
+                    shipmentLeg: {
+                        select: {
+                            id: true, status: true,
+                            arrivedAtOriginAt: true, dispatchedAt: true, arrivedAtDestAt: true,
+                            destWarehouse: { select: { id: true, name: true, city: true } },
+                        }
+                    },
                 }
             },
-            // Include FulfillmentTask + Warehouse so seller knows where to ship
+            // Include FulfillmentTask + Destination Warehouse (customer's end)
             fulfillmentTask: {
                 include: {
                     warehouse: {

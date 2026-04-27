@@ -82,8 +82,19 @@ const reviewLocationRequest = catchAsync(async (req: Request, res: Response) => 
   sendResponse(res, { status: status.OK, success: true, message: `Request ${action.toLowerCase()}`, data });
 });
 
+const getMyWarehouse = catchAsync(async (req: Request, res: Response) => {
+  const data = await warehouseService.getMyWarehouse(req.user!.id);
+  sendResponse(res, { status: status.OK, success: true, message: "Your warehouse fetched", data });
+});
+
+const getInboundOrders = catchAsync(async (req: Request, res: Response) => {
+  const data = await warehouseService.getInboundOrders(req.params.warehouseId as string);
+  sendResponse(res, { status: status.OK, success: true, message: "Inbound orders fetched", data });
+});
+
 export const warehouseController = {
   createWarehouse, listWarehouses, getWarehouse, updateWarehouse,
   deleteWarehouse, getNearestWarehouses, addLocation, listLocations,
   submitLocationRequest, listLocationRequests, reviewLocationRequest,
+  getMyWarehouse, getInboundOrders,
 };

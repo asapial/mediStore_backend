@@ -94,9 +94,11 @@ model User {
   email     String   @unique
   image     String?
   // password  String 
-  role      Role     @default(CUSTOMER)
-  isBanned  Boolean  @default(false)
-  createdAt DateTime @default(now())
+  role         Role     @default(CUSTOMER)
+  isBanned     Boolean  @default(false)
+  businessCity String?  // Seller's dispatch city — used for origin WH auto-assignment
+  phone        String?  // Contact phone — collected for all roles on profile
+  createdAt    DateTime @default(now())
 
   medicines     Medicine[]
   orders        Order[]
@@ -216,10 +218,11 @@ model Order {
 
   user          User            @relation(fields: [userId], references: [id])
   items         OrderItem[]
-  subOrders     SubOrder[]
-  tracking      OrderTracking[]
-  returnRequest ReturnRequest?
+  subOrders       SubOrder[]
+  tracking        OrderTracking[]
+  returnRequest   ReturnRequest?
   fulfillmentTask FulfillmentTask?
+  shipmentLegs    ShipmentLeg[]
 }
 
 model OrderItem {
@@ -340,17 +343,20 @@ model Review {
 
 // ─── SubOrder (Multi-Seller Split) ──────────────────────────────────────────────────────
 model SubOrder {
-  id        String      @id @default(cuid())
-  orderId   String
-  sellerId  String
-  status    OrderStatus @default(PLACED)
-  total     Float       @default(0)
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
+  id                String      @id @default(cuid())
+  orderId           String
+  sellerId          String
+  status            OrderStatus @default(PLACED)
+  total             Float       @default(0)
+  originWarehouseId String?     // Seller's nearest WH — set at order creation
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
 
-  order  Order       @relation(fields: [orderId], references: [id])
-  seller User        @relation("SellerSubOrders", fields: [sellerId], references: [id])
-  items  OrderItem[]
+  order           Order      @relation(fields: [orderId], references: [id])
+  seller          User       @relation("SellerSubOrders", fields: [sellerId], references: [id])
+  items           OrderItem[]
+  originWarehouse Warehouse? @relation("SubOrderOriginWH", fields: [originWarehouseId], references: [id])
+  shipmentLeg     ShipmentLeg?
 
   @@map("sub_order")
 }
@@ -653,7 +659,9 @@ enum GRNStatus {
 }
 
 enum FulfillmentStatus {
-  PENDING
+  PENDING        // Waiting for first item to arrive at destination WH
+  CONSOLIDATING  // Some items staged — still waiting for others
+  READY          // All items arrived at destination WH — ready to pack
   PICKED
   PACKED
   DISPATCHED
@@ -695,12 +703,15 @@ model Warehouse {
   transfersFrom    StockTransfer[]     @relation("TransferFrom")
   transfersTo      StockTransfer[]     @relation("TransferTo")
   grns             GoodsReceiptNote[]
-  fulfillmentTasks FulfillmentTask[]
-  expiryAlerts     ExpiryAlert[]
-  storageBins      StorageBin[]
-  shipments        SupplierShipment[]
-  temperatureLogs  TemperatureLog[]
-  locationRequests WarehouseLocationRequest[]
+  fulfillmentTasks    FulfillmentTask[]
+  expiryAlerts        ExpiryAlert[]
+  storageBins         StorageBin[]
+  shipments           SupplierShipment[]
+  temperatureLogs     TemperatureLog[]
+  locationRequests    WarehouseLocationRequest[]
+  originLegs          ShipmentLeg[]  @relation("ShipmentLegOrigin")
+  destLegs            ShipmentLeg[]  @relation("ShipmentLegDest")
+  subOrdersAsOrigin   SubOrder[]     @relation("SubOrderOriginWH")
 
   @@map("warehouse")
 }
@@ -997,4 +1008,38 @@ model WithdrawalRequest {
   seller User @relation("SellerWithdrawals", fields: [sellerId], references: [id])
 
   @@map("withdrawal_request")
+}
+
+// ─── Multi-Leg Shipment Routing ──────────────────────────────────────────────
+// Tracks each SubOrder's physical journey:
+//   Seller → Origin WH → (inter-WH transfer) → Destination WH → Pack & Deliver
+
+enum ShipmentLegStatus {
+  SELLER_PREPARING    // Seller hasn't marked SHIPPED yet
+  AWAITING_ORIGIN_WH  // Seller marked SHIPPED — origin WH should confirm receipt
+  AT_ORIGIN_WH        // Origin WH confirmed receipt
+  IN_TRANSIT          // Origin WH dispatched to destination WH
+  AT_DEST_WH          // Arrived at destination WH — ready to consolidate
+}
+
+model ShipmentLeg {
+  id                String            @id @default(cuid())
+  orderId           String
+  subOrderId        String            @unique
+  originWarehouseId String
+  destWarehouseId   String
+  status            ShipmentLegStatus @default(SELLER_PREPARING)
+  arrivedAtOriginAt DateTime?         // when origin WH confirmed receipt
+  dispatchedAt      DateTime?         // when origin WH sent to dest WH
+  arrivedAtDestAt   DateTime?         // when dest WH confirmed arrival
+  stagedAt          DateTime?         // when fulfillment worker staged items at dest WH
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  order           Order     @relation(fields: [orderId],           references: [id])
+  subOrder        SubOrder  @relation(fields: [subOrderId],        references: [id])
+  originWarehouse Warehouse @relation("ShipmentLegOrigin", fields: [originWarehouseId], references: [id])
+  destWarehouse   Warehouse @relation("ShipmentLegDest",   fields: [destWarehouseId],   references: [id])
+
+  @@map("shipment_leg")
 }

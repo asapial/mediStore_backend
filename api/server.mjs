@@ -5,7 +5,7 @@ import {
   init_enums,
   init_prisma,
   prisma
-} from "./chunk-QMMVNLXO.mjs";
+} from "./chunk-LWFV7FMU.mjs";
 
 // src/lib/auth.ts
 import { betterAuth } from "better-auth";
@@ -27,7 +27,7 @@ var init_auth = __esm({
       user: {
         additionalFields: {
           role: {
-            type: ["CUSTOMER", "SELLER", "ADMIN"],
+            type: ["CUSTOMER", "SELLER", "ADMIN", "WAREHOUSE"],
             required: false,
             defaultValue: "CUSTOMER",
             input: true
@@ -40,7 +40,7 @@ var init_auth = __esm({
           create: {
             before: async (user) => {
               const role = user.role;
-              if (role === "ADMIN" || !["CUSTOMER", "SELLER"].includes(role)) {
+              if (role === "ADMIN" || role === "WAREHOUSE" || !["CUSTOMER", "SELLER"].includes(role)) {
                 return { data: { ...user, role: "CUSTOMER" } };
               }
               return { data: user };
@@ -110,17 +110,316 @@ var init_seller_types = __esm({
   }
 });
 
+// src/errorHelpers/AppError.ts
+var AppError, AppError_default;
+var init_AppError = __esm({
+  "src/errorHelpers/AppError.ts"() {
+    "use strict";
+    AppError = class extends Error {
+      statusCode;
+      constructor(statusCode, message, stack = "") {
+        super(message);
+        this.statusCode = statusCode;
+        if (stack) {
+          this.stack = stack;
+        } else {
+          Error.captureStackTrace(this, this.constructor);
+        }
+      }
+    };
+    AppError_default = AppError;
+  }
+});
+
+// src/utils/bdGeo.ts
+function extractCoordsFromBDAddress(rawAddress) {
+  const parts = rawAddress.split(",").map((p) => p.trim().toLowerCase()).filter(Boolean);
+  const cleaned = parts[parts.length - 1] === "bangladesh" ? parts.slice(0, -1) : parts;
+  if (!cleaned.length) return null;
+  const len = cleaned.length;
+  const candidates = [
+    len >= 2 ? cleaned[len - 2] : null,
+    // district slot
+    cleaned[len - 1],
+    // division slot
+    len >= 3 ? cleaned[len - 3] : null
+    // thana/upazila (sometimes same as district)
+  ];
+  for (const c of candidates) {
+    if (!c) continue;
+    if (DISTRICTS[c]) return DISTRICTS[c];
+    if (DIVISIONS[c]) return DIVISIONS[c];
+  }
+  for (let i = cleaned.length - 1; i >= 0; i--) {
+    const tok = cleaned[i];
+    if (DISTRICTS[tok]) return DISTRICTS[tok];
+    if (DIVISIONS[tok]) return DIVISIONS[tok];
+  }
+  return null;
+}
+function haversineKm(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+var DIVISIONS, DISTRICTS;
+var init_bdGeo = __esm({
+  "src/utils/bdGeo.ts"() {
+    "use strict";
+    DIVISIONS = {
+      "dhaka": { lat: 23.8103, lng: 90.4125 },
+      "chittagong": { lat: 22.3569, lng: 91.7832 },
+      "chattogram": { lat: 22.3569, lng: 91.7832 },
+      // official spelling
+      "rajshahi": { lat: 24.3745, lng: 88.6042 },
+      "khulna": { lat: 22.8456, lng: 89.5403 },
+      "barishal": { lat: 22.701, lng: 90.3535 },
+      "barisal": { lat: 22.701, lng: 90.3535 },
+      // common alternate
+      "sylhet": { lat: 24.8949, lng: 91.8687 },
+      "rangpur": { lat: 25.7439, lng: 89.2752 },
+      "mymensingh": { lat: 24.7471, lng: 90.4203 }
+    };
+    DISTRICTS = {
+      // ── Dhaka Division ────────────────────────────────────────────────────────
+      "dhaka": { lat: 23.8103, lng: 90.4125 },
+      "gazipur": { lat: 23.9999, lng: 90.4203 },
+      "narayanganj": { lat: 23.6238, lng: 90.4999 },
+      "narsingdi": { lat: 23.9225, lng: 90.7155 },
+      "manikganj": { lat: 23.8639, lng: 89.9961 },
+      "munshiganj": { lat: 23.5422, lng: 90.5303 },
+      "tangail": { lat: 24.2513, lng: 89.9167 },
+      "faridpur": { lat: 23.607, lng: 89.8429 },
+      "gopalganj": { lat: 23.0055, lng: 89.8268 },
+      "madaripur": { lat: 23.1641, lng: 90.1956 },
+      "rajbari": { lat: 23.7577, lng: 89.6447 },
+      "shariatpur": { lat: 23.2423, lng: 90.435 },
+      "kishoreganj": { lat: 24.4447, lng: 90.7767 },
+      // ── Mymensingh Division ───────────────────────────────────────────────────
+      "mymensingh": { lat: 24.7471, lng: 90.4203 },
+      "jamalpur": { lat: 24.9375, lng: 89.9377 },
+      "sherpur": { lat: 25.019, lng: 90.0155 },
+      "netrokona": { lat: 24.8703, lng: 90.7279 },
+      // ── Chittagong Division ───────────────────────────────────────────────────
+      "chittagong": { lat: 22.3569, lng: 91.7832 },
+      "chattogram": { lat: 22.3569, lng: 91.7832 },
+      "cox's bazar": { lat: 21.4272, lng: 92.0058 },
+      "coxs bazar": { lat: 21.4272, lng: 92.0058 },
+      "cox bazar": { lat: 21.4272, lng: 92.0058 },
+      "feni": { lat: 23.0159, lng: 91.3976 },
+      "noakhali": { lat: 22.8696, lng: 91.0994 },
+      "lakshmipur": { lat: 22.9446, lng: 90.8282 },
+      "laksmipur": { lat: 22.9446, lng: 90.8282 },
+      "comilla": { lat: 23.4607, lng: 91.1809 },
+      "cumilla": { lat: 23.4607, lng: 91.1809 },
+      "chandpur": { lat: 23.2323, lng: 90.6517 },
+      "brahmanbaria": { lat: 23.9603, lng: 91.1114 },
+      "b. baria": { lat: 23.9603, lng: 91.1114 },
+      "rangamati": { lat: 22.65, lng: 92.2002 },
+      "khagrachhari": { lat: 23.1193, lng: 91.9847 },
+      "bandarban": { lat: 22.1953, lng: 92.2184 },
+      // ── Rajshahi Division ─────────────────────────────────────────────────────
+      "rajshahi": { lat: 24.3745, lng: 88.6042 },
+      "chapainawabganj": { lat: 24.5964, lng: 88.275 },
+      "chapai nawabganj": { lat: 24.5964, lng: 88.275 },
+      "natore": { lat: 24.4204, lng: 89.0001 },
+      "sirajganj": { lat: 24.4534, lng: 89.7006 },
+      "pabna": { lat: 24.0064, lng: 89.2372 },
+      "naogaon": { lat: 24.7936, lng: 88.9312 },
+      "joypurhat": { lat: 25.0978, lng: 89.0225 },
+      "bogra": { lat: 24.851, lng: 89.3697 },
+      "bogura": { lat: 24.851, lng: 89.3697 },
+      // ── Khulna Division ───────────────────────────────────────────────────────
+      "khulna": { lat: 22.8456, lng: 89.5403 },
+      "jessore": { lat: 23.1634, lng: 89.2182 },
+      "jashore": { lat: 23.1634, lng: 89.2182 },
+      "satkhira": { lat: 22.7185, lng: 89.0705 },
+      "narail": { lat: 23.1726, lng: 89.5123 },
+      "magura": { lat: 23.4884, lng: 89.4196 },
+      "jhenaidah": { lat: 23.5448, lng: 89.1508 },
+      "jhenaidaha": { lat: 23.5448, lng: 89.1508 },
+      "kushtia": { lat: 23.9012, lng: 89.1208 },
+      "meherpur": { lat: 23.7614, lng: 88.6318 },
+      "chuadanga": { lat: 23.6401, lng: 88.841 },
+      "bagerhat": { lat: 22.6602, lng: 89.7854 },
+      // ── Barishal Division ─────────────────────────────────────────────────────
+      "barishal": { lat: 22.701, lng: 90.3535 },
+      "barisal": { lat: 22.701, lng: 90.3535 },
+      "bhola": { lat: 22.6857, lng: 90.6482 },
+      "patuakhali": { lat: 22.3596, lng: 90.3298 },
+      "pirojpur": { lat: 22.5791, lng: 89.9754 },
+      "jhalakathi": { lat: 22.6404, lng: 90.1982 },
+      "jhalokathi": { lat: 22.6404, lng: 90.1982 },
+      "barguna": { lat: 22.0949, lng: 90.1116 },
+      // ── Sylhet Division ───────────────────────────────────────────────────────
+      "sylhet": { lat: 24.8949, lng: 91.8687 },
+      "moulvibazar": { lat: 24.4829, lng: 91.7774 },
+      "maulvibazar": { lat: 24.4829, lng: 91.7774 },
+      "habiganj": { lat: 24.3746, lng: 91.4157 },
+      "sunamganj": { lat: 25.0658, lng: 91.3991 },
+      // ── Rangpur Division ──────────────────────────────────────────────────────
+      "rangpur": { lat: 25.7439, lng: 89.2752 },
+      "dinajpur": { lat: 25.6279, lng: 88.6338 },
+      "thakurgaon": { lat: 26.0336, lng: 88.4616 },
+      "panchagarh": { lat: 26.3411, lng: 88.5541 },
+      "nilphamari": { lat: 25.9317, lng: 88.8561 },
+      "lalmonirhat": { lat: 25.9923, lng: 89.2847 },
+      "kurigram": { lat: 25.8072, lng: 89.6364 },
+      "gaibandha": { lat: 25.3288, lng: 89.5285 }
+    };
+  }
+});
+
+// src/module/subOrder/subOrder.service.ts
+import status from "http-status";
+async function getNearestWarehouseToAddress(deliveryAddress) {
+  const warehouses = await prisma.warehouse.findMany({
+    where: { isActive: true },
+    orderBy: { createdAt: "asc" }
+  });
+  if (!warehouses.length) {
+    throw new AppError_default(status.SERVICE_UNAVAILABLE, "No active warehouse available. Contact admin.");
+  }
+  if (warehouses.length === 1) return warehouses[0];
+  const coords = extractCoordsFromBDAddress(deliveryAddress);
+  if (!coords) {
+    console.warn(`[warehouse-assign] Could not resolve coords for: "${deliveryAddress}" \u2014 assigning ${warehouses[0].name}`);
+    return warehouses[0];
+  }
+  const nearest = warehouses.reduce((best, wh) => {
+    const distBest = haversineKm(coords.lat, coords.lng, best.lat, best.lng);
+    const distWh = haversineKm(coords.lat, coords.lng, wh.lat, wh.lng);
+    return distWh < distBest ? wh : best;
+  });
+  const finalDist = haversineKm(coords.lat, coords.lng, nearest.lat, nearest.lng);
+  console.info(`[warehouse-assign] "${deliveryAddress}" \u2192 ${nearest.name} (${nearest.city}) \u2014 ${finalDist.toFixed(1)} km`);
+  return nearest;
+}
+async function ensureFulfillmentTask(orderId) {
+  const existing = await prisma.fulfillmentTask.findUnique({ where: { orderId } });
+  if (existing) return existing;
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: { address: true }
+  });
+  const deliveryAddress = order?.address ?? "";
+  const warehouse = await getNearestWarehouseToAddress(deliveryAddress);
+  const task = await prisma.fulfillmentTask.create({
+    data: { orderId, warehouseId: warehouse.id, status: "PENDING" }
+  });
+  await prisma.order.updateMany({
+    where: { id: orderId, status: { in: ["PLACED", "CONFIRMED"] } },
+    data: { status: "PROCESSING" }
+  });
+  await prisma.orderTracking.create({
+    data: {
+      orderId,
+      status: "CONFIRMED",
+      note: `Order is being processed at ${warehouse.name} (${warehouse.city}). Packages are being consolidated.`
+    }
+  });
+  return task;
+}
+var getSellerSubOrders, getOrderSubOrders, updateSubOrderStatus, subOrderService;
+var init_subOrder_service = __esm({
+  "src/module/subOrder/subOrder.service.ts"() {
+    "use strict";
+    init_prisma();
+    init_AppError();
+    init_bdGeo();
+    getSellerSubOrders = async (sellerId) => {
+      return prisma.subOrder.findMany({
+        where: { sellerId },
+        include: {
+          order: {
+            select: {
+              id: true,
+              address: true,
+              createdAt: true,
+              status: true,
+              user: { select: { name: true, email: true } }
+            }
+          },
+          items: {
+            include: {
+              medicine: { select: { id: true, name: true, price: true, image: true } }
+            }
+          },
+          shipmentLeg: {
+            select: {
+              id: true,
+              status: true,
+              originWarehouse: { select: { id: true, name: true, city: true } },
+              destWarehouse: { select: { id: true, name: true, city: true } }
+            }
+          }
+        },
+        orderBy: { createdAt: "desc" }
+      });
+    };
+    getOrderSubOrders = async (orderId, userId) => {
+      const order = await prisma.order.findFirst({ where: { id: orderId, userId } });
+      if (!order) throw new AppError_default(status.NOT_FOUND, "Order not found");
+      return prisma.subOrder.findMany({
+        where: { orderId },
+        include: {
+          seller: { select: { name: true, email: true } },
+          items: {
+            include: {
+              medicine: { select: { id: true, name: true, price: true, image: true } }
+            }
+          },
+          shipmentLeg: {
+            select: {
+              id: true,
+              status: true,
+              arrivedAtOriginAt: true,
+              dispatchedAt: true,
+              arrivedAtDestAt: true,
+              originWarehouse: { select: { id: true, name: true, city: true } },
+              destWarehouse: { select: { id: true, name: true, city: true } }
+            }
+          }
+        }
+      });
+    };
+    updateSubOrderStatus = async (id, sellerId, orderStatus) => {
+      const sub = await prisma.subOrder.findFirst({ where: { id, sellerId } });
+      if (!sub) throw new AppError_default(status.NOT_FOUND, "Sub-order not found");
+      const updated = await prisma.subOrder.update({
+        where: { id },
+        data: { status: orderStatus }
+      });
+      if (orderStatus === "SHIPPED") {
+        await prisma.shipmentLeg.updateMany({
+          where: { subOrderId: id, status: "SELLER_PREPARING" },
+          data: { status: "AWAITING_ORIGIN_WH" }
+        });
+        await ensureFulfillmentTask(sub.orderId);
+      }
+      return updated;
+    };
+    subOrderService = {
+      getSellerSubOrders,
+      getOrderSubOrders,
+      updateSubOrderStatus
+    };
+  }
+});
+
 // src/module/seller/seller.service.ts
 import { ZodError } from "zod";
-var postMedicineQuery, updateMedicineQuery, deleteMedicineQuery, getSellerOrderQuery, getSellerStats, updateOrderItemStatusQuery, sellerService;
+var postMedicineQuery, updateMedicineQuery, deleteMedicineQuery, getSellerOrderQuery, getSellerStats, updateOrderItemStatusQuery, getInventoryQuery, sellerService;
 var init_seller_service = __esm({
   "src/module/seller/seller.service.ts"() {
     "use strict";
     init_prisma();
     init_seller_types();
+    init_subOrder_service();
     postMedicineQuery = async (data, sellerId) => {
       try {
-        console.log(sellerId);
         const validatedData = postMedicineSchema.parse(data);
         const prismaData = {
           ...validatedData,
@@ -192,21 +491,65 @@ var init_seller_service = __esm({
               quantity: true,
               price: true,
               status: true,
-              medicine: {
+              subOrderId: true,
+              medicine: { select: { sellerId: true, name: true, image: true } }
+            }
+          },
+          // Include SubOrders so the frontend knows which flow to use
+          subOrders: {
+            where: { sellerId: id },
+            include: {
+              items: {
+                include: {
+                  medicine: { select: { id: true, name: true, image: true, price: true } }
+                }
+              },
+              // Origin warehouse = where seller should physically ship their items
+              originWarehouse: {
                 select: {
-                  sellerId: true,
+                  id: true,
                   name: true,
-                  image: true
+                  address: true,
+                  city: true,
+                  country: true,
+                  phone: true,
+                  manager: { select: { name: true, email: true } }
+                }
+              },
+              // ShipmentLeg for real-time tracking status
+              shipmentLeg: {
+                select: {
+                  id: true,
+                  status: true,
+                  arrivedAtOriginAt: true,
+                  dispatchedAt: true,
+                  arrivedAtDestAt: true,
+                  destWarehouse: { select: { id: true, name: true, city: true } }
+                }
+              }
+            }
+          },
+          // Include FulfillmentTask + Destination Warehouse (customer's end)
+          fulfillmentTask: {
+            include: {
+              warehouse: {
+                select: {
+                  id: true,
+                  name: true,
+                  address: true,
+                  city: true,
+                  country: true,
+                  phone: true,
+                  manager: { select: { name: true, email: true } }
                 }
               }
             }
           }
-        }
+        },
+        orderBy: { createdAt: "desc" }
       });
       const filteredOrders = orders.flatMap((order) => {
-        const items = order.items.filter(
-          (item) => item.medicine?.sellerId === id
-        );
+        const items = order.items.filter((item) => item.medicine?.sellerId === id);
         if (!items.length) return [];
         return [{
           id: order.id,
@@ -214,7 +557,9 @@ var init_seller_service = __esm({
           address: order.address,
           createdAt: order.createdAt,
           user: { name: order.user?.name ?? "\u2014", email: order.user?.email ?? "\u2014" },
-          items
+          items,
+          subOrders: order.subOrders ?? [],
+          fulfillmentTask: order.fulfillmentTask ?? null
         }];
       });
       return filteredOrders;
@@ -347,35 +692,32 @@ var init_seller_service = __esm({
         thisMonthRevenue
       };
     };
-    updateOrderItemStatusQuery = async (orderId, orderItemsList, status33) => {
+    updateOrderItemStatusQuery = async (orderId, orderItemsList, status53) => {
       await prisma.orderItem.updateMany({
         where: { id: { in: orderItemsList }, orderId },
-        data: { status: status33 }
+        data: { status: status53 }
       });
-      if (status33 === "SHIPPED") {
-        const items = await prisma.orderItem.findMany({
-          where: { id: { in: orderItemsList } },
-          select: { medicineId: true, quantity: true }
-        });
-        await Promise.all(
-          items.map(
-            (item) => prisma.medicine.update({
-              where: { id: item.medicineId },
-              data: { stock: { decrement: item.quantity } }
-            })
-          )
-        );
-      }
       const remaining = await prisma.orderItem.count({
-        where: { orderId, status: { not: status33 } }
+        where: { orderId, status: { not: status53 } }
       });
       if (remaining === 0) {
-        await prisma.order.update({
-          where: { id: orderId },
-          data: { status: status33 }
-        });
+        await prisma.order.update({ where: { id: orderId }, data: { status: status53 } });
+        if (status53 === "SHIPPED") {
+          await ensureFulfillmentTask(orderId);
+        }
       }
       return { success: true };
+    };
+    getInventoryQuery = async (sellerId) => {
+      return await prisma.medicine.findMany({
+        where: { sellerId },
+        include: {
+          batches: true,
+          stockAlert: true,
+          expiryAlerts: true
+        },
+        orderBy: { createdAt: "desc" }
+      });
     };
     sellerService = {
       postMedicineQuery,
@@ -383,23 +725,31 @@ var init_seller_service = __esm({
       deleteMedicineQuery,
       getSellerOrderQuery,
       getSellerStats,
-      updateOrderItemStatusQuery
+      updateOrderItemStatusQuery,
+      getInventoryQuery
     };
   }
 });
 
 // src/module/seller/seller.controller.ts
 import { ZodError as ZodError2 } from "zod";
-var postMedicine, updateMedicine, deleteMedicine, getSellerOrder, sellerStatController, updateOrderItemStatus, sellerController;
+var postMedicine, updateMedicine, deleteMedicine, getSellerOrder, sellerStatController, updateOrderItemStatus, getInventory, sellerController;
 var init_seller_controller = __esm({
   "src/module/seller/seller.controller.ts"() {
     "use strict";
     init_seller_service();
+    init_prisma();
     postMedicine = async (req, res, next) => {
       try {
-        const data = req.body;
         const sellerId = req.user.id;
-        console.log(sellerId);
+        const license = await prisma.sellerLicense.findUnique({ where: { sellerId } });
+        if (!license || license.status !== "VERIFIED") {
+          return res.status(403).json({
+            success: false,
+            message: "Your seller license must be approved (VERIFIED) by an admin before you can add medicines."
+          });
+        }
+        const data = req.body;
         const result = await sellerService.postMedicineQuery(data, sellerId);
         res.status(201).json({
           message: "Medicine Added Successfully",
@@ -417,7 +767,7 @@ var init_seller_controller = __esm({
         }
         console.error("Error from controller:", error);
         return res.status(500).json({
-          message: "Internal server error1",
+          message: "Internal server error",
           error: error.message || "Unknown error"
         });
       }
@@ -465,7 +815,6 @@ var init_seller_controller = __esm({
     };
     getSellerOrder = async (req, res, next) => {
       const sellerId = req.user.id;
-      console.log(sellerId);
       try {
         const result = await sellerService.getSellerOrderQuery(sellerId);
         if (result.length === 0) {
@@ -503,15 +852,14 @@ var init_seller_controller = __esm({
     };
     updateOrderItemStatus = async (req, res, next) => {
       try {
-        const { orderId, orderItemIds, status: status33 } = req.body;
-        console.log(orderId, orderItemIds, status33);
+        const { orderId, orderItemIds, status: status53 } = req.body;
         if (!orderId || !Array.isArray(orderItemIds) || orderItemIds.length === 0) {
           return res.status(400).json({
             success: false,
             message: "orderId and orderItemIds are required"
           });
         }
-        if (!status33) {
+        if (!status53) {
           return res.status(400).json({
             success: false,
             message: "status is required"
@@ -520,12 +868,28 @@ var init_seller_controller = __esm({
         const result = await sellerService.updateOrderItemStatusQuery(
           orderId,
           orderItemIds,
-          status33
+          status53
         );
         return res.status(200).json({
           success: true,
           message: "Order item status updated successfully",
           data: result
+        });
+      } catch (error) {
+        next(error);
+      }
+    };
+    getInventory = async (req, res, next) => {
+      try {
+        const sellerId = req.user?.id;
+        if (!sellerId) {
+          return res.status(401).json({ success: false, message: "Unauthorized" });
+        }
+        const inventory = await sellerService.getInventoryQuery(sellerId);
+        res.status(200).json({
+          success: true,
+          message: "Inventory fetched successfully",
+          data: inventory
         });
       } catch (error) {
         next(error);
@@ -537,7 +901,8 @@ var init_seller_controller = __esm({
       deleteMedicine,
       getSellerOrder,
       sellerStatController,
-      updateOrderItemStatus
+      updateOrderItemStatus,
+      getInventory
     };
   }
 });
@@ -554,8 +919,6 @@ var init_auth_middleware = __esm({
           const session = await auth.api.getSession({
             headers: req.headers
           });
-          console.log("Headers ", req.headers);
-          console.log("Session ", session);
           if (!session || !session.user) {
             return res.status(401).json({
               success: false,
@@ -599,6 +962,7 @@ var init_seller_route = __esm({
     router.get("/orders", auth_middleware_default(["SELLER"]), sellerController.getSellerOrder);
     router.get("/stat", auth_middleware_default(), sellerController.sellerStatController);
     router.put("/orders", auth_middleware_default(["SELLER"]), sellerController.updateOrderItemStatus);
+    router.get("/inventory", auth_middleware_default(["SELLER"]), sellerController.getInventory);
     sellerRouter = router;
   }
 });
@@ -614,19 +978,43 @@ var init_order_types = __esm({
       items: z3.array(
         z3.object({
           medicineId: z3.string().min(1, "Medicine ID is required"),
-          quantity: z3.number().int().positive("Quantity must be at least 1")
+          quantity: z3.number().int().positive("Quantity must be at least 1"),
+          priceOverride: z3.number().positive().optional().nullable(),
+          // flash-sale price per unit
+          flashQuantity: z3.number().int().min(0).optional().default(0)
+          // units at flash price
         })
-      ).min(1, "At least one order item is required")
+      ).min(1, "At least one order item is required"),
+      couponCode: z3.string().optional()
     });
   }
 });
 
 // src/module/orders/order.service.ts
+async function nearestWarehouse(address) {
+  const whs = await prisma.warehouse.findMany({ where: { isActive: true } });
+  if (!whs.length) return null;
+  if (whs.length === 1) return whs[0];
+  let coords = null;
+  const gpsMatch = address.match(/GPS\(\s*([\d.]+)\s*,\s*([\d.]+)\s*\)/i);
+  if (gpsMatch) {
+    coords = { lat: parseFloat(gpsMatch[1]), lng: parseFloat(gpsMatch[2]) };
+  } else {
+    coords = extractCoordsFromBDAddress(address);
+  }
+  if (!coords) return whs[0];
+  return whs.reduce((best, wh) => {
+    const distWh = wh.lat != null && wh.lng != null ? haversineKm(coords.lat, coords.lng, wh.lat, wh.lng) : Infinity;
+    const distBest = best.lat != null && best.lng != null ? haversineKm(coords.lat, coords.lng, best.lat, best.lng) : Infinity;
+    return distWh < distBest ? wh : best;
+  });
+}
 var postOrderQuery, getUserOrdersQuery, getOrderDetailsQuery, deleteOrderByCustomer, getCustomerStats, orderService;
 var init_order_service = __esm({
   "src/module/orders/order.service.ts"() {
     "use strict";
     init_prisma();
+    init_bdGeo();
     postOrderQuery = async (userId, data) => {
       return await prisma.$transaction(async (tx) => {
         const medicineIds = data.items.map((i) => i.medicineId);
@@ -636,91 +1024,176 @@ var init_order_service = __esm({
         if (medicines.length !== medicineIds.length) {
           throw new Error("One or more medicines not found");
         }
+        for (const item of data.items) {
+          const medicine = medicines.find((m) => m.id === item.medicineId);
+          if (item.quantity > medicine.stock) {
+            throw new Error(
+              `Insufficient stock for "${medicine.name}". Available: ${medicine.stock}, Requested: ${item.quantity}`
+            );
+          }
+        }
         const order = await tx.order.create({
+          data: { userId, address: data.address }
+        });
+        await tx.orderTracking.create({
           data: {
-            userId,
-            address: data.address
+            orderId: order.id,
+            status: "PLACED",
+            note: "Order placed successfully. Processing your items."
           }
         });
-        const orderItemsData = data.items.map((item) => {
+        const destWarehouse = await nearestWarehouse(data.address);
+        const sellerItems = data.items.reduce((acc, item) => {
           const medicine = medicines.find((m) => m.id === item.medicineId);
-          return {
-            orderId: order.id,
-            medicineId: medicine.id,
-            quantity: item.quantity,
-            price: medicine.price
-            // price snapshot
-          };
-        });
-        await tx.orderItem.createMany({
-          data: orderItemsData
-        });
+          if (!acc[medicine.sellerId]) acc[medicine.sellerId] = [];
+          acc[medicine.sellerId].push({ ...item, medicine });
+          return acc;
+        }, {});
+        for (const sellerId in sellerItems) {
+          const itemRows = (sellerItems[sellerId] ?? []).map((item) => {
+            const flashQty = item.flashQuantity ?? 0;
+            const regularQty = item.quantity - flashQty;
+            const flashPrice = flashQty > 0 && item.priceOverride != null ? item.priceOverride : item.medicine.price;
+            const priceSnapshot = (flashQty * flashPrice + regularQty * item.medicine.price) / item.quantity;
+            return { medicineId: item.medicineId, quantity: item.quantity, price: priceSnapshot };
+          });
+          const subTotal = itemRows.reduce((s, r) => s + r.price * r.quantity, 0);
+          const seller = await tx.user.findUnique({
+            where: { id: sellerId },
+            select: { businessCity: true }
+          });
+          const originWarehouse = seller?.businessCity ? await nearestWarehouse(seller.businessCity) : destWarehouse;
+          const subOrder = await tx.subOrder.create({
+            data: {
+              orderId: order.id,
+              sellerId,
+              total: subTotal,
+              status: "PLACED",
+              originWarehouseId: originWarehouse?.id ?? destWarehouse?.id ?? null
+            }
+          });
+          await tx.orderItem.createMany({
+            data: itemRows.map((r) => ({ ...r, orderId: order.id, subOrderId: subOrder.id }))
+          });
+          if (destWarehouse) {
+            await tx.shipmentLeg.create({
+              data: {
+                orderId: order.id,
+                subOrderId: subOrder.id,
+                originWarehouseId: originWarehouse?.id ?? destWarehouse.id,
+                destWarehouseId: destWarehouse.id,
+                status: "SELLER_PREPARING"
+              }
+            });
+          }
+        }
+        await Promise.all(
+          data.items.map(
+            (item) => tx.medicine.update({
+              where: { id: item.medicineId },
+              data: { stock: { decrement: item.quantity } }
+            })
+          )
+        );
+        const flashItems = data.items.filter(
+          (item) => (item.flashQuantity ?? 0) > 0 && item.priceOverride != null
+        );
+        if (flashItems.length > 0) {
+          const now = /* @__PURE__ */ new Date();
+          await Promise.all(
+            flashItems.map(async (item) => {
+              const flashSale = await tx.flashSale.findFirst({
+                where: {
+                  medicineId: item.medicineId,
+                  discountPrice: item.priceOverride,
+                  isApproved: true,
+                  startAt: { lte: now },
+                  endAt: { gte: now }
+                }
+              });
+              if (flashSale) {
+                await tx.flashSale.update({
+                  where: { id: flashSale.id },
+                  data: { soldCount: { increment: item.flashQuantity } }
+                });
+              }
+            })
+          );
+        }
         return order;
       });
     };
     getUserOrdersQuery = async (userId) => {
-      const result = await prisma.order.findMany({
-        where: {
-          userId
-        },
+      return prisma.order.findMany({
+        where: { userId },
         include: {
           items: {
             include: {
               medicine: {
+                select: { name: true, description: true, price: true, image: true, sellerId: true }
+              }
+            }
+          },
+          subOrders: {
+            include: {
+              seller: { select: { id: true, name: true, email: true } },
+              items: {
+                include: {
+                  medicine: { select: { id: true, name: true, price: true, image: true } }
+                }
+              },
+              shipmentLeg: {
                 select: {
-                  name: true,
-                  description: true,
-                  price: true,
-                  image: true,
-                  sellerId: true
+                  id: true,
+                  status: true,
+                  arrivedAtOriginAt: true,
+                  dispatchedAt: true,
+                  arrivedAtDestAt: true,
+                  originWarehouse: { select: { id: true, name: true, city: true } },
+                  destWarehouse: { select: { id: true, name: true, city: true } }
                 }
               }
             }
-          }
-        }
+          },
+          fulfillmentTask: {
+            select: {
+              id: true,
+              status: true,
+              startedAt: true,
+              packedAt: true,
+              dispatchedAt: true,
+              warehouse: { select: { id: true, name: true, city: true } }
+            }
+          },
+          tracking: { orderBy: { createdAt: "asc" } }
+        },
+        orderBy: { createdAt: "desc" }
       });
-      return result;
     };
     getOrderDetailsQuery = async (orderId) => {
       const result = await prisma.order.findUnique({
-        where: {
-          id: orderId
-        },
+        where: { id: orderId },
         include: {
           items: {
             include: {
               medicine: {
-                select: {
-                  name: true,
-                  description: true,
-                  price: true,
-                  image: true
-                }
+                select: { name: true, description: true, price: true, image: true }
               }
             }
-          }
+          },
+          tracking: { orderBy: { createdAt: "asc" } }
         }
       });
-      if (!result) {
-        throw new Error("Order not found");
-      }
+      if (!result) throw new Error("Order not found");
       return result;
     };
     deleteOrderByCustomer = async (orderId) => {
-      const order = await prisma.order.findUnique({
-        where: {
-          id: orderId
-        }
-      });
-      if (!order) {
-        throw new Error("Order not found");
-      }
+      const order = await prisma.order.findUnique({ where: { id: orderId } });
+      if (!order) throw new Error("Order not found");
       if (order.status === "DELIVERED" || order.status === "CANCELLED") {
         throw new Error("Cannot delete delivered or cancelled orders");
       }
-      await prisma.order.delete({
-        where: { id: orderId }
-      });
+      await prisma.order.delete({ where: { id: orderId } });
       return { message: "Order deleted successfully" };
     };
     getCustomerStats = async (userId) => {
@@ -1060,7 +1533,7 @@ var init_admin_service = __esm({
 });
 
 // src/module/admin/admin.controller.ts
-var getAllUsers, getUserDetails, getAllCategory, createCategory, deleteCategory, updateUser, updateCategory, getAdminStatsController, getAllOrder2, banUserController, adminUpdateUser, toggleCategoryFeatured, updateCategoryMeta, adminController;
+var getAllUsers, getUserDetails, getAllCategory, createCategory, deleteCategory, updateUser, updateCategory, getAdminStatsController, getAllOrder2, banUserController, adminUpdateUser, toggleCategoryFeatured, updateCategoryMeta, searchUsers, adminController;
 var init_admin_controller = __esm({
   "src/module/admin/admin.controller.ts"() {
     "use strict";
@@ -1266,9 +1739,9 @@ var init_admin_controller = __esm({
     toggleCategoryFeatured = async (req, res) => {
       try {
         const { id } = req.params;
-        const cat = await (await import("./prisma-7A2BDF5Q.mjs")).prisma.category.findUnique({ where: { id } });
+        const cat = await (await import("./prisma-OAS4LPRP.mjs")).prisma.category.findUnique({ where: { id } });
         if (!cat) return res.status(404).json({ status: false, message: "Category not found" });
-        const updated = await (await import("./prisma-7A2BDF5Q.mjs")).prisma.category.update({
+        const updated = await (await import("./prisma-OAS4LPRP.mjs")).prisma.category.update({
           where: { id },
           data: { isFeatured: !cat.isFeatured }
         });
@@ -1281,13 +1754,31 @@ var init_admin_controller = __esm({
       try {
         const { id } = req.params;
         const { icon, color, name } = req.body;
-        const updated = await (await import("./prisma-7A2BDF5Q.mjs")).prisma.category.update({
+        const updated = await (await import("./prisma-OAS4LPRP.mjs")).prisma.category.update({
           where: { id },
           data: { ...icon ? { icon } : {}, ...color ? { color } : {}, ...name ? { name } : {} }
         });
         return res.status(200).json({ status: true, message: "Category updated", data: updated });
       } catch (error) {
         return res.status(500).json({ status: false, message: "Internal server error", error });
+      }
+    };
+    searchUsers = async (req, res) => {
+      try {
+        const email = (req.query.email || "").trim();
+        if (!email || email.length < 2) {
+          return res.status(200).json({ status: true, data: [] });
+        }
+        const { prisma: prisma2 } = await import("./prisma-OAS4LPRP.mjs");
+        const users = await prisma2.user.findMany({
+          where: { email: { contains: email, mode: "insensitive" } },
+          select: { id: true, name: true, email: true, image: true, role: true },
+          take: 8,
+          orderBy: { email: "asc" }
+        });
+        return res.status(200).json({ status: true, data: users });
+      } catch (error) {
+        return res.status(500).json({ status: false, message: "Search failed", error });
       }
     };
     adminController = {
@@ -1303,7 +1794,8 @@ var init_admin_controller = __esm({
       createCategory,
       deleteCategory,
       toggleCategoryFeatured,
-      updateCategoryMeta
+      updateCategoryMeta,
+      searchUsers
     };
   }
 });
@@ -1318,6 +1810,7 @@ var init_admin_route = __esm({
     init_auth_middleware();
     router3 = Router3();
     router3.get("/users", auth_middleware_default(["ADMIN"]), adminController.getAllUsers);
+    router3.get("/users/search", auth_middleware_default(["ADMIN"]), adminController.searchUsers);
     router3.get("/users/:id", adminController.getUserDetails);
     router3.get("/categories", adminController.getAllCategory);
     router3.post("/categories", auth_middleware_default(["ADMIN"]), adminController.createCategory);
@@ -1471,8 +1964,8 @@ var init_auth_route = __esm({
     router4 = Router4();
     router4.post("/register", authController.registerController);
     router4.post("/login", authController.loginController);
-    router4.get("/me", auth_middleware_default(["CUSTOMER", "SELLER", "ADMIN"]), authController.meController);
-    router4.patch("/update", auth_middleware_default(["CUSTOMER", "SELLER", "ADMIN"]), authController.updateProfileController);
+    router4.get("/me", auth_middleware_default(["CUSTOMER", "SELLER", "ADMIN", "WAREHOUSE"]), authController.meController);
+    router4.patch("/update", auth_middleware_default(["CUSTOMER", "SELLER", "ADMIN", "WAREHOUSE"]), authController.updateProfileController);
     authRouter = router4;
   }
 });
@@ -1535,7 +2028,6 @@ var init_medicine_service = __esm({
           }
         }
       });
-      console.log(medicines);
       return medicines;
     };
     getMedicineById = async (id) => {
@@ -1592,8 +2084,6 @@ var init_medicine_controller = __esm({
       try {
         const userId = req.user.id;
         const medicines = await medicineService.getMyMedicines(userId);
-        console.log(userId);
-        console.log(medicines);
         res.status(200).json({
           success: true,
           count: medicines.length,
@@ -1658,7 +2148,7 @@ var init_sendResponse = __esm({
 
 // src/module/medicine/medicine.router.ts
 import { Router as Router5 } from "express";
-import status from "http-status";
+import status2 from "http-status";
 var router5, medicineRouter;
 var init_medicine_router = __esm({
   "src/module/medicine/medicine.router.ts"() {
@@ -1682,7 +2172,7 @@ var init_medicine_router = __esm({
         orderBy: { createdAt: "desc" },
         take: 20
       });
-      sendResponse(res, { status: status.OK, success: true, message: "Featured medicines", data: medicines });
+      sendResponse(res, { status: status2.OK, success: true, message: "Featured medicines", data: medicines });
     }));
     router5.patch("/:id/feature", auth_middleware_default(["ADMIN"]), catchAsync(async (req, res) => {
       const { isFeatured } = req.body;
@@ -1694,16 +2184,16 @@ var init_medicine_router = __esm({
           category: { select: { id: true, name: true } }
         }
       });
-      sendResponse(res, { status: status.OK, success: true, message: `Medicine ${isFeatured ? "featured" : "unfeatured"}`, data: med });
+      sendResponse(res, { status: status2.OK, success: true, message: `Medicine ${isFeatured ? "featured" : "unfeatured"}`, data: med });
     }));
     router5.patch("/categories/:id/featured", auth_middleware_default(["ADMIN"]), catchAsync(async (req, res) => {
       const cat = await prisma.category.findUnique({ where: { id: req.params.id } });
-      if (!cat) return sendResponse(res, { status: status.NOT_FOUND, success: false, message: "Category not found", data: null });
+      if (!cat) return sendResponse(res, { status: status2.NOT_FOUND, success: false, message: "Category not found", data: null });
       const updated = await prisma.category.update({
         where: { id: req.params.id },
         data: { isFeatured: !cat.isFeatured }
       });
-      sendResponse(res, { status: status.OK, success: true, message: `Category ${updated.isFeatured ? "featured" : "unfeatured"}`, data: updated });
+      sendResponse(res, { status: status2.OK, success: true, message: `Category ${updated.isFeatured ? "featured" : "unfeatured"}`, data: updated });
     }));
     router5.get("/:id", medicineController.getMedicineById);
     medicineRouter = router5;
@@ -1711,38 +2201,76 @@ var init_medicine_router = __esm({
 });
 
 // src/module/cart/cart.service.ts
-var addToCartService, getMedicineCartStatus, getFromCartService, updateCartItemService, removeCartItemService, clearCartService, cartService;
+import status3 from "http-status";
+var findActiveFlashSale, addToCartService, getMedicineCartStatus, getFromCartService, updateCartItemService, removeCartItemService, clearCartService, cartService;
 var init_cart_service = __esm({
   "src/module/cart/cart.service.ts"() {
     "use strict";
+    init_AppError();
     init_prisma();
-    addToCartService = async (userId, medicineId, quantity = 1) => {
-      console.log(userId, medicineId, quantity);
+    findActiveFlashSale = async (medicineId) => {
+      const now = /* @__PURE__ */ new Date();
+      return prisma.flashSale.findFirst({
+        where: {
+          medicineId,
+          isApproved: true,
+          startAt: { lte: now },
+          endAt: { gte: now }
+        },
+        orderBy: { endAt: "asc" }
+      });
+    };
+    addToCartService = async (userId, medicineId, quantity = 1, priceOverride) => {
+      const medicine = await prisma.medicine.findUnique({ where: { id: medicineId } });
+      if (!medicine) throw new AppError_default(status3.NOT_FOUND, "Medicine not found");
       let cart = await prisma.cart.findUnique({ where: { userId } });
-      if (!cart) {
-        cart = await prisma.cart.create({
-          data: { userId }
+      if (!cart) cart = await prisma.cart.create({ data: { userId } });
+      const existing = await prisma.cartItem.findUnique({
+        where: { cartId_medicineId: { cartId: cart.id, medicineId } }
+      });
+      const currentQtyInCart = existing?.quantity ?? 0;
+      const totalQtyAfterAdd = currentQtyInCart + quantity;
+      if (totalQtyAfterAdd > medicine.stock) {
+        throw new AppError_default(
+          status3.BAD_REQUEST,
+          `Only ${medicine.stock} unit(s) available in stock (you already have ${currentQtyInCart} in cart).`
+        );
+      }
+      let newFlashQtyForThisAdd = 0;
+      let resolvedPriceOverride = null;
+      if (priceOverride != null) {
+        const flashSale = await findActiveFlashSale(medicineId);
+        if (flashSale) {
+          const alreadyFlashInCart = existing?.flashQuantity ?? 0;
+          const globalAvailable = flashSale.saleStock - flashSale.soldCount;
+          const additionalFlash = Math.max(0, globalAvailable - alreadyFlashInCart);
+          newFlashQtyForThisAdd = Math.min(quantity, additionalFlash);
+          resolvedPriceOverride = newFlashQtyForThisAdd > 0 ? flashSale.discountPrice : null;
+        }
+      }
+      let cartItem;
+      if (existing) {
+        const newTotalFlash = (existing.flashQuantity ?? 0) + newFlashQtyForThisAdd;
+        cartItem = await prisma.cartItem.update({
+          where: { id: existing.id },
+          data: {
+            quantity: totalQtyAfterAdd,
+            flashQuantity: newTotalFlash,
+            // Only lock in priceOverride if we actually have flash units
+            ...resolvedPriceOverride != null ? { priceOverride: resolvedPriceOverride } : {}
+          }
+        });
+      } else {
+        cartItem = await prisma.cartItem.create({
+          data: {
+            cartId: cart.id,
+            medicineId,
+            quantity,
+            priceOverride: resolvedPriceOverride,
+            flashQuantity: newFlashQtyForThisAdd
+          }
         });
       }
-      const cartItem = await prisma.cartItem.upsert({
-        where: {
-          cartId_medicineId: {
-            cartId: cart.id,
-            medicineId
-          }
-        },
-        update: {
-          quantity: {
-            increment: quantity
-          }
-        },
-        create: {
-          cartId: cart.id,
-          medicineId,
-          quantity
-        }
-      });
-      console.log(cartItem);
       return cartItem;
     };
     getMedicineCartStatus = async (userId, medicineId) => {
@@ -1750,68 +2278,67 @@ var init_cart_service = __esm({
         where: { userId },
         include: { items: true }
       });
-      if (!cart) {
-        return { inCart: false, quantity: 0 };
-      }
+      if (!cart) return { inCart: false, quantity: 0 };
       const cartItem = cart.items.find((item) => item.medicineId === medicineId);
-      if (!cartItem) {
-        return { inCart: false, quantity: 0 };
-      }
+      if (!cartItem) return { inCart: false, quantity: 0 };
       return { inCart: true, quantity: cartItem.quantity };
     };
     getFromCartService = async (userId) => {
       const cart = await prisma.cart.findUnique({
         where: { userId },
-        // ✅ userId exists on Cart
         include: {
           items: {
-            include: {
-              medicine: true
-            }
+            include: { medicine: true }
           }
         }
       });
       if (!cart) return { items: [], totalQuantity: 0, totalPrice: 0 };
       const totalQuantity = cart.items.reduce((sum, item) => sum + item.quantity, 0);
-      const totalPrice = cart.items.reduce((sum, item) => sum + item.quantity * item.medicine.price, 0);
-      return {
-        items: cart.items,
-        totalQuantity,
-        totalPrice
-      };
+      const totalPrice = cart.items.reduce((sum, item) => {
+        const flashQty = item.flashQuantity ?? 0;
+        const regularQty = item.quantity - flashQty;
+        const flashPrice = item.priceOverride ?? item.medicine.price;
+        return sum + flashQty * flashPrice + regularQty * item.medicine.price;
+      }, 0);
+      return { items: cart.items, totalQuantity, totalPrice };
     };
     updateCartItemService = async (userId, itemId, quantity) => {
-      if (quantity < 1) {
-        throw new Error("Quantity must be at least 1");
-      }
+      if (quantity < 1) throw new AppError_default(status3.BAD_REQUEST, "Quantity must be at least 1");
       const cartItem = await prisma.cartItem.findUnique({
         where: { id: itemId },
         include: { medicine: true }
       });
-      if (!cartItem) throw new Error("Cart item not found");
+      if (!cartItem) throw new AppError_default(status3.NOT_FOUND, "Cart item not found");
       if (quantity > cartItem.medicine.stock) {
-        throw new Error("Quantity exceeds available stock");
+        throw new AppError_default(
+          status3.BAD_REQUEST,
+          `Only ${cartItem.medicine.stock} unit(s) available in stock`
+        );
+      }
+      let newFlashQty = 0;
+      if (cartItem.priceOverride != null) {
+        const flashSale = await findActiveFlashSale(cartItem.medicineId);
+        if (flashSale) {
+          const flashSlotsAvailable = flashSale.saleStock - flashSale.soldCount;
+          newFlashQty = Math.min(quantity, Math.max(0, flashSlotsAvailable));
+        }
       }
       const updated = await prisma.cartItem.update({
         where: { id: itemId },
-        data: { quantity },
+        data: {
+          quantity,
+          flashQuantity: newFlashQty
+        },
         include: { medicine: true }
       });
-      console.log(updated);
       return updated;
     };
     removeCartItemService = async (userId, itemId) => {
-      const cartItem = await prisma.cartItem.findUnique({
-        where: { id: itemId }
-      });
-      if (!cartItem) throw new Error("Cart item not found");
-      const cart = await prisma.cart.findUnique({
-        where: { id: cartItem.cartId }
-      });
-      if (!cart || cart.userId !== userId) throw new Error("Unauthorized");
-      await prisma.cartItem.delete({
-        where: { id: itemId }
-      });
+      const cartItem = await prisma.cartItem.findUnique({ where: { id: itemId } });
+      if (!cartItem) throw new AppError_default(status3.NOT_FOUND, "Cart item not found");
+      const cart = await prisma.cart.findUnique({ where: { id: cartItem.cartId } });
+      if (!cart || cart.userId !== userId) throw new AppError_default(status3.UNAUTHORIZED, "Unauthorized");
+      await prisma.cartItem.delete({ where: { id: itemId } });
       return { success: true, message: "Cart item removed successfully" };
     };
     clearCartService = async (userId) => {
@@ -1839,8 +2366,7 @@ var init_cart_controller = __esm({
     init_cart_service();
     addToCartController = async (req, res, next) => {
       try {
-        const { medicineId, quantity } = req.body;
-        console.log(medicineId, quantity);
+        const { medicineId, quantity, priceOverride } = req.body;
         if (!medicineId) {
           return res.status(400).json({
             success: false,
@@ -1848,7 +2374,13 @@ var init_cart_controller = __esm({
           });
         }
         const userId = req.user.id;
-        const cartItem = await cartService.addToCartService(userId, medicineId, quantity || 1);
+        const cartItem = await cartService.addToCartService(
+          userId,
+          medicineId,
+          quantity || 1,
+          priceOverride ?? null
+          // ← flash-sale price or null
+        );
         return res.status(200).json({
           success: true,
           message: "Item added to cart",
@@ -1868,10 +2400,10 @@ var init_cart_controller = __esm({
             message: "User ID and Medicine ID are required"
           });
         }
-        const status33 = await cartService.getMedicineCartStatus(userId, medicineId);
+        const status53 = await cartService.getMedicineCartStatus(userId, medicineId);
         return res.status(200).json({
           success: true,
-          data: status33
+          data: status53
         });
       } catch (err) {
         next(err);
@@ -1965,27 +2497,6 @@ var init_cart_router = __esm({
   }
 });
 
-// src/errorHelpers/AppError.ts
-var AppError, AppError_default;
-var init_AppError = __esm({
-  "src/errorHelpers/AppError.ts"() {
-    "use strict";
-    AppError = class extends Error {
-      statusCode;
-      constructor(statusCode, message, stack = "") {
-        super(message);
-        this.statusCode = statusCode;
-        if (stack) {
-          this.stack = stack;
-        } else {
-          Error.captureStackTrace(this, this.constructor);
-        }
-      }
-    };
-    AppError_default = AppError;
-  }
-});
-
 // src/module/prescription/prescription.service.ts
 var uploadPrescription, getMyPrescriptions, getAllPrescriptions, reviewPrescription, prescriptionService;
 var init_prescription_service = __esm({
@@ -2007,20 +2518,20 @@ var init_prescription_service = __esm({
         orderBy: { createdAt: "desc" }
       });
     };
-    getAllPrescriptions = async (status33) => {
+    getAllPrescriptions = async (status53) => {
       return prisma.prescription.findMany({
-        where: status33 !== void 0 ? { status: status33 } : {},
+        where: status53 !== void 0 ? { status: status53 } : {},
         include: {
           user: { select: { id: true, name: true, email: true } }
         },
         orderBy: { createdAt: "desc" }
       });
     };
-    reviewPrescription = async (id, status33, adminNote) => {
+    reviewPrescription = async (id, status53, adminNote) => {
       return prisma.prescription.update({
         where: { id },
         data: {
-          status: status33,
+          status: status53,
           ...adminNote !== void 0 ? { adminNote } : {}
         }
       });
@@ -2035,7 +2546,7 @@ var init_prescription_service = __esm({
 });
 
 // src/module/prescription/prescription.controller.ts
-import status2 from "http-status";
+import status4 from "http-status";
 var uploadPrescription2, getMyPrescriptions2, getAllPrescriptions2, reviewPrescription2, prescriptionController;
 var init_prescription_controller = __esm({
   "src/module/prescription/prescription.controller.ts"() {
@@ -2047,10 +2558,10 @@ var init_prescription_controller = __esm({
     uploadPrescription2 = catchAsync(async (req, res) => {
       const userId = req.user.id;
       const { imageUrl, notes } = req.body;
-      if (!imageUrl) throw new AppError_default(status2.BAD_REQUEST, "imageUrl is required");
+      if (!imageUrl) throw new AppError_default(status4.BAD_REQUEST, "imageUrl is required");
       const data = await prescriptionService.uploadPrescription(userId, imageUrl, notes);
       sendResponse(res, {
-        status: status2.CREATED,
+        status: status4.CREATED,
         success: true,
         message: "Prescription uploaded successfully",
         data
@@ -2060,7 +2571,7 @@ var init_prescription_controller = __esm({
       const userId = req.user.id;
       const data = await prescriptionService.getMyPrescriptions(userId);
       sendResponse(res, {
-        status: status2.OK,
+        status: status4.OK,
         success: true,
         message: "Prescriptions fetched successfully",
         data
@@ -2070,7 +2581,7 @@ var init_prescription_controller = __esm({
       const statusFilter = req.query.status;
       const data = await prescriptionService.getAllPrescriptions(statusFilter);
       sendResponse(res, {
-        status: status2.OK,
+        status: status4.OK,
         success: true,
         message: "All prescriptions fetched",
         data
@@ -2079,13 +2590,13 @@ var init_prescription_controller = __esm({
     reviewPrescription2 = catchAsync(async (req, res) => {
       const id = String(req.params.id);
       const { status: newStatus, adminNote } = req.body;
-      if (!newStatus) throw new AppError_default(status2.BAD_REQUEST, "status is required");
+      if (!newStatus) throw new AppError_default(status4.BAD_REQUEST, "status is required");
       const data = await prescriptionService.reviewPrescription(
         id,
         newStatus,
         adminNote
       );
-      sendResponse(res, { status: status2.OK, success: true, message: "Prescription reviewed", data });
+      sendResponse(res, { status: status4.OK, success: true, message: "Prescription reviewed", data });
     });
     prescriptionController = {
       uploadPrescription: uploadPrescription2,
@@ -2114,7 +2625,7 @@ var init_prescription_route = __esm({
 });
 
 // src/module/wallet/wallet.service.ts
-var getOrCreateWallet, getWalletWithTransactions, creditWallet, debitWallet, getAllWallets, walletService;
+var getOrCreateWallet, getWalletWithTransactions, creditWallet, debitWallet, getAllWallets, getSellerWallet, requestWithdrawal, getSellerWithdrawals, getAllWithdrawals, processWithdrawal, walletService;
 var init_wallet_service = __esm({
   "src/module/wallet/wallet.service.ts"() {
     "use strict";
@@ -2183,19 +2694,95 @@ var init_wallet_service = __esm({
         orderBy: { balance: "desc" }
       });
     };
+    getSellerWallet = async (sellerId) => {
+      const wallet = await getOrCreateWallet(sellerId);
+      const transactions = await prisma.walletTransaction.findMany({
+        where: { walletId: wallet.id },
+        orderBy: { createdAt: "desc" },
+        take: 100
+      });
+      const pendingWithdrawals = await prisma.withdrawalRequest.findMany({
+        where: { sellerId, status: "PENDING" }
+      });
+      const pendingAmount = pendingWithdrawals.reduce((s, w) => s + w.amount, 0);
+      const totalEarned = transactions.filter((t) => t.type === "DEPOSIT").reduce((s, t) => s + t.amount, 0);
+      const totalWithdrawn = transactions.filter((t) => t.type === "WITHDRAWAL").reduce((s, t) => s + t.amount, 0);
+      return { ...wallet, transactions, pendingAmount, totalEarned, totalWithdrawn };
+    };
+    requestWithdrawal = async (sellerId, amount, bankName, accountNumber, branchName) => {
+      const wallet = await getOrCreateWallet(sellerId);
+      if (wallet.balance < amount) throw new Error("Insufficient wallet balance for this withdrawal");
+      if (amount < 10) throw new Error("Minimum withdrawal amount is $10");
+      return prisma.withdrawalRequest.create({
+        data: { sellerId, amount, bankName, accountNumber, branchName }
+      });
+    };
+    getSellerWithdrawals = async (sellerId) => {
+      return prisma.withdrawalRequest.findMany({
+        where: { sellerId },
+        orderBy: { createdAt: "desc" }
+      });
+    };
+    getAllWithdrawals = async (statusFilter) => {
+      return prisma.withdrawalRequest.findMany({
+        where: statusFilter ? { status: statusFilter } : void 0,
+        include: {
+          seller: { select: { id: true, name: true, email: true } }
+        },
+        orderBy: { createdAt: "desc" }
+      });
+    };
+    processWithdrawal = async (id, action, adminNote) => {
+      const request = await prisma.withdrawalRequest.findUnique({ where: { id } });
+      if (!request) throw new Error("Withdrawal request not found");
+      if (request.status !== "PENDING") throw new Error("Request is already processed");
+      if (action === "APPROVED") {
+        const wallet = await getOrCreateWallet(request.sellerId);
+        if (wallet.balance < request.amount) throw new Error("Seller has insufficient balance");
+        await prisma.$transaction([
+          prisma.wallet.update({
+            where: { id: wallet.id },
+            data: { balance: { decrement: request.amount } }
+          }),
+          prisma.walletTransaction.create({
+            data: {
+              walletId: wallet.id,
+              amount: request.amount,
+              type: TransactionType.WITHDRAWAL,
+              description: `Withdrawal approved \u2014 ref #${id.slice(-6).toUpperCase()}`
+            }
+          }),
+          prisma.withdrawalRequest.update({
+            where: { id },
+            data: { status: "APPROVED", adminNote: adminNote || null, processedAt: /* @__PURE__ */ new Date() }
+          })
+        ]);
+      } else {
+        await prisma.withdrawalRequest.update({
+          where: { id },
+          data: { status: "REJECTED", adminNote: adminNote || null, processedAt: /* @__PURE__ */ new Date() }
+        });
+      }
+      return prisma.withdrawalRequest.findUnique({ where: { id } });
+    };
     walletService = {
       getWalletWithTransactions,
       creditWallet,
       debitWallet,
       getAllWallets,
-      getOrCreateWallet
+      getOrCreateWallet,
+      getSellerWallet,
+      requestWithdrawal,
+      getSellerWithdrawals,
+      getAllWithdrawals,
+      processWithdrawal
     };
   }
 });
 
 // src/module/wallet/wallet.controller.ts
-import status3 from "http-status";
-var getMyWallet, topUpWallet, getAllWallets2, adminCreditWallet, walletController;
+import status5 from "http-status";
+var getMyWallet, topUpWallet, getAllWallets2, adminCreditWallet, getSellerWallet2, getWithdrawals, requestWithdrawal2, getAllWithdrawals2, processWithdrawal2, walletController;
 var init_wallet_controller = __esm({
   "src/module/wallet/wallet.controller.ts"() {
     "use strict";
@@ -2206,53 +2793,74 @@ var init_wallet_controller = __esm({
     getMyWallet = catchAsync(async (req, res) => {
       const userId = req.user.id;
       const data = await walletService.getWalletWithTransactions(userId);
-      sendResponse(res, {
-        status: status3.OK,
-        success: true,
-        message: "Wallet fetched successfully",
-        data
-      });
+      sendResponse(res, { status: status5.OK, success: true, message: "Wallet fetched successfully", data });
     });
     topUpWallet = catchAsync(async (req, res) => {
       const userId = req.user.id;
       const { amount, description } = req.body;
       if (!amount || amount <= 0)
-        throw new AppError_default(status3.BAD_REQUEST, "amount must be a positive number");
+        throw new AppError_default(status5.BAD_REQUEST, "amount must be a positive number");
       const data = await walletService.creditWallet(userId, Number(amount), description);
-      sendResponse(res, {
-        status: status3.OK,
-        success: true,
-        message: "Wallet topped up successfully",
-        data
-      });
+      sendResponse(res, { status: status5.OK, success: true, message: "Wallet topped up successfully", data });
     });
     getAllWallets2 = catchAsync(async (_req, res) => {
       const data = await walletService.getAllWallets();
-      sendResponse(res, {
-        status: status3.OK,
-        success: true,
-        message: "All wallets fetched",
-        data
-      });
+      sendResponse(res, { status: status5.OK, success: true, message: "All wallets fetched", data });
     });
     adminCreditWallet = catchAsync(async (req, res) => {
       const { userId, amount, description } = req.body;
-      if (!userId) throw new AppError_default(status3.BAD_REQUEST, "userId is required");
-      if (!amount || amount <= 0)
-        throw new AppError_default(status3.BAD_REQUEST, "amount must be a positive number");
+      if (!userId) throw new AppError_default(status5.BAD_REQUEST, "userId is required");
+      if (!amount || amount <= 0) throw new AppError_default(status5.BAD_REQUEST, "amount must be a positive number");
       const data = await walletService.creditWallet(userId, Number(amount), description);
-      sendResponse(res, {
-        status: status3.OK,
-        success: true,
-        message: "Wallet credited successfully",
-        data
-      });
+      sendResponse(res, { status: status5.OK, success: true, message: "Wallet credited successfully", data });
+    });
+    getSellerWallet2 = catchAsync(async (req, res) => {
+      const sellerId = req.user.id;
+      const data = await walletService.getSellerWallet(sellerId);
+      sendResponse(res, { status: status5.OK, success: true, message: "Seller wallet fetched", data });
+    });
+    getWithdrawals = catchAsync(async (req, res) => {
+      const sellerId = req.user.id;
+      const data = await walletService.getSellerWithdrawals(sellerId);
+      sendResponse(res, { status: status5.OK, success: true, message: "Withdrawals fetched", data });
+    });
+    requestWithdrawal2 = catchAsync(async (req, res) => {
+      const sellerId = req.user.id;
+      const { amount, bankName, accountNumber, branchName } = req.body;
+      if (!amount || !bankName || !accountNumber)
+        throw new AppError_default(status5.BAD_REQUEST, "amount, bankName and accountNumber are required");
+      const data = await walletService.requestWithdrawal(
+        sellerId,
+        Number(amount),
+        bankName,
+        accountNumber,
+        branchName
+      );
+      sendResponse(res, { status: status5.CREATED, success: true, message: "Withdrawal request submitted", data });
+    });
+    getAllWithdrawals2 = catchAsync(async (req, res) => {
+      const statusFilter = req.query.status;
+      const data = await walletService.getAllWithdrawals(statusFilter);
+      sendResponse(res, { status: status5.OK, success: true, message: "All withdrawals fetched", data });
+    });
+    processWithdrawal2 = catchAsync(async (req, res) => {
+      const { id } = req.params;
+      const { action, adminNote } = req.body;
+      if (!["APPROVED", "REJECTED"].includes(action))
+        throw new AppError_default(status5.BAD_REQUEST, "action must be APPROVED or REJECTED");
+      const data = await walletService.processWithdrawal(id, action, adminNote);
+      sendResponse(res, { status: status5.OK, success: true, message: `Withdrawal ${action.toLowerCase()}`, data });
     });
     walletController = {
       getMyWallet,
       topUpWallet,
       getAllWallets: getAllWallets2,
-      adminCreditWallet
+      adminCreditWallet,
+      getSellerWallet: getSellerWallet2,
+      getWithdrawals,
+      requestWithdrawal: requestWithdrawal2,
+      getAllWithdrawals: getAllWithdrawals2,
+      processWithdrawal: processWithdrawal2
     };
   }
 });
@@ -2268,8 +2876,13 @@ var init_wallet_route = __esm({
     router8 = Router8();
     router8.get("/my", auth_middleware_default(["CUSTOMER"]), walletController.getMyWallet);
     router8.post("/topup", auth_middleware_default(["CUSTOMER"]), walletController.topUpWallet);
+    router8.get("/seller/my", auth_middleware_default(["SELLER"]), walletController.getSellerWallet);
+    router8.get("/seller/withdrawals", auth_middleware_default(["SELLER"]), walletController.getWithdrawals);
+    router8.post("/seller/withdraw", auth_middleware_default(["SELLER"]), walletController.requestWithdrawal);
     router8.get("/", auth_middleware_default(["ADMIN"]), walletController.getAllWallets);
     router8.post("/credit", auth_middleware_default(["ADMIN"]), walletController.adminCreditWallet);
+    router8.get("/admin/withdrawals", auth_middleware_default(["ADMIN"]), walletController.getAllWithdrawals);
+    router8.patch("/admin/withdrawals/:id", auth_middleware_default(["ADMIN"]), walletController.processWithdrawal);
     walletRouter = router8;
   }
 });
@@ -2326,10 +2939,10 @@ var init_subscription_service = __esm({
         orderBy: { createdAt: "desc" }
       });
     };
-    updateSubscriptionStatus = async (id, userId, status33) => {
+    updateSubscriptionStatus = async (id, userId, status53) => {
       return prisma.subscription.update({
         where: { id, userId },
-        data: { status: status33 }
+        data: { status: status53 }
       });
     };
     subscriptionService = {
@@ -2342,7 +2955,7 @@ var init_subscription_service = __esm({
 });
 
 // src/module/subscription/subscription.controller.ts
-import status4 from "http-status";
+import status6 from "http-status";
 var createSubscription2, getMySubscriptions2, updateSubscriptionStatus2, getSellerSubscriptions2, subscriptionController;
 var init_subscription_controller = __esm({
   "src/module/subscription/subscription.controller.ts"() {
@@ -2354,7 +2967,7 @@ var init_subscription_controller = __esm({
     createSubscription2 = catchAsync(async (req, res) => {
       const userId = req.user.id;
       const { medicineId, quantity = 1, frequency = "MONTHLY" } = req.body;
-      if (!medicineId) throw new AppError_default(status4.BAD_REQUEST, "medicineId is required");
+      if (!medicineId) throw new AppError_default(status6.BAD_REQUEST, "medicineId is required");
       const data = await subscriptionService.createSubscription(
         userId,
         medicineId,
@@ -2362,7 +2975,7 @@ var init_subscription_controller = __esm({
         frequency
       );
       sendResponse(res, {
-        status: status4.CREATED,
+        status: status6.CREATED,
         success: true,
         message: "Subscription created successfully",
         data
@@ -2372,7 +2985,7 @@ var init_subscription_controller = __esm({
       const userId = req.user.id;
       const data = await subscriptionService.getMySubscriptions(userId);
       sendResponse(res, {
-        status: status4.OK,
+        status: status6.OK,
         success: true,
         message: "Subscriptions fetched",
         data
@@ -2382,19 +2995,19 @@ var init_subscription_controller = __esm({
       const userId = req.user.id;
       const id = String(req.params.id);
       const { status: newStatus } = req.body;
-      if (!newStatus) throw new AppError_default(status4.BAD_REQUEST, "status is required");
+      if (!newStatus) throw new AppError_default(status6.BAD_REQUEST, "status is required");
       const data = await subscriptionService.updateSubscriptionStatus(
         id,
         userId,
         newStatus
       );
-      sendResponse(res, { status: status4.OK, success: true, message: "Subscription updated", data });
+      sendResponse(res, { status: status6.OK, success: true, message: "Subscription updated", data });
     });
     getSellerSubscriptions2 = catchAsync(async (req, res) => {
       const sellerId = req.user.id;
       const data = await subscriptionService.getSellerSubscriptions(sellerId);
       sendResponse(res, {
-        status: status4.OK,
+        status: status6.OK,
         success: true,
         message: "Seller subscriptions fetched",
         data
@@ -2427,7 +3040,7 @@ var init_subscription_route = __esm({
 });
 
 // src/module/stockAlert/stockAlert.service.ts
-import status5 from "http-status";
+import status7 from "http-status";
 var upsertStockAlert, getSellerAlerts, getTriggeredAlerts, deleteStockAlert, stockAlertService;
 var init_stockAlert_service = __esm({
   "src/module/stockAlert/stockAlert.service.ts"() {
@@ -2436,7 +3049,7 @@ var init_stockAlert_service = __esm({
     init_AppError();
     upsertStockAlert = async (medicineId, threshold, isActive = true) => {
       const medicine = await prisma.medicine.findUnique({ where: { id: medicineId } });
-      if (!medicine) throw new AppError_default(status5.NOT_FOUND, "Medicine not found");
+      if (!medicine) throw new AppError_default(status7.NOT_FOUND, "Medicine not found");
       return prisma.stockAlert.upsert({
         where: { medicineId },
         update: { threshold, isActive },
@@ -2479,7 +3092,7 @@ var init_stockAlert_service = __esm({
 });
 
 // src/module/stockAlert/stockAlert.controller.ts
-import status6 from "http-status";
+import status8 from "http-status";
 var upsertStockAlert2, getSellerAlerts2, getTriggeredAlerts2, deleteStockAlert2, stockAlertController;
 var init_stockAlert_controller = __esm({
   "src/module/stockAlert/stockAlert.controller.ts"() {
@@ -2490,16 +3103,16 @@ var init_stockAlert_controller = __esm({
     init_stockAlert_service();
     upsertStockAlert2 = catchAsync(async (req, res) => {
       const { medicineId, threshold, isActive = true } = req.body;
-      if (!medicineId) throw new AppError_default(status6.BAD_REQUEST, "medicineId is required");
+      if (!medicineId) throw new AppError_default(status8.BAD_REQUEST, "medicineId is required");
       if (threshold === void 0 || threshold < 0)
-        throw new AppError_default(status6.BAD_REQUEST, "threshold must be a non-negative number");
+        throw new AppError_default(status8.BAD_REQUEST, "threshold must be a non-negative number");
       const data = await stockAlertService.upsertStockAlert(
         medicineId,
         Number(threshold),
         Boolean(isActive)
       );
       sendResponse(res, {
-        status: status6.OK,
+        status: status8.OK,
         success: true,
         message: "Stock alert saved",
         data
@@ -2509,7 +3122,7 @@ var init_stockAlert_controller = __esm({
       const sellerId = req.user.id;
       const data = await stockAlertService.getSellerAlerts(sellerId);
       sendResponse(res, {
-        status: status6.OK,
+        status: status8.OK,
         success: true,
         message: "Stock alerts fetched",
         data
@@ -2518,7 +3131,7 @@ var init_stockAlert_controller = __esm({
     getTriggeredAlerts2 = catchAsync(async (_req, res) => {
       const data = await stockAlertService.getTriggeredAlerts();
       sendResponse(res, {
-        status: status6.OK,
+        status: status8.OK,
         success: true,
         message: "Triggered alerts fetched",
         data
@@ -2527,7 +3140,7 @@ var init_stockAlert_controller = __esm({
     deleteStockAlert2 = catchAsync(async (req, res) => {
       const medicineId = String(req.params.medicineId);
       const data = await stockAlertService.deleteStockAlert(medicineId);
-      sendResponse(res, { status: status6.OK, success: true, message: "Stock alert deleted", data });
+      sendResponse(res, { status: status8.OK, success: true, message: "Stock alert deleted", data });
     });
     stockAlertController = {
       upsertStockAlert: upsertStockAlert2,
@@ -2556,7 +3169,7 @@ var init_stockAlert_route = __esm({
 });
 
 // src/module/medicineBatch/medicineBatch.service.ts
-import status7 from "http-status";
+import status9 from "http-status";
 var createBatch, getSellerBatches, getExpiringBatches, deleteBatch, medicineBatchService;
 var init_medicineBatch_service = __esm({
   "src/module/medicineBatch/medicineBatch.service.ts"() {
@@ -2568,7 +3181,7 @@ var init_medicineBatch_service = __esm({
         where: { id: input.medicineId, sellerId }
       });
       if (!medicine) {
-        throw new AppError_default(status7.NOT_FOUND, "Medicine not found or not owned by you");
+        throw new AppError_default(status9.NOT_FOUND, "Medicine not found or not owned by you");
       }
       return prisma.medicineBatch.create({
         data: {
@@ -2610,7 +3223,7 @@ var init_medicineBatch_service = __esm({
       const batch = await prisma.medicineBatch.findFirst({
         where: { id, medicine: { sellerId } }
       });
-      if (!batch) throw new AppError_default(status7.NOT_FOUND, "Batch not found");
+      if (!batch) throw new AppError_default(status9.NOT_FOUND, "Batch not found");
       return prisma.medicineBatch.delete({ where: { id } });
     };
     medicineBatchService = {
@@ -2623,7 +3236,7 @@ var init_medicineBatch_service = __esm({
 });
 
 // src/module/medicineBatch/medicineBatch.controller.ts
-import status8 from "http-status";
+import status10 from "http-status";
 var createBatch2, getSellerBatches2, getExpiringBatches2, deleteBatch2, medicineBatchController;
 var init_medicineBatch_controller = __esm({
   "src/module/medicineBatch/medicineBatch.controller.ts"() {
@@ -2637,7 +3250,7 @@ var init_medicineBatch_controller = __esm({
       const { medicineId, batchNumber, quantity, expiryDate, purchaseDate } = req.body;
       if (!medicineId || !batchNumber || !quantity || !expiryDate)
         throw new AppError_default(
-          status8.BAD_REQUEST,
+          status10.BAD_REQUEST,
           "medicineId, batchNumber, quantity, and expiryDate are required"
         );
       const data = await medicineBatchService.createBatch(sellerId, {
@@ -2648,7 +3261,7 @@ var init_medicineBatch_controller = __esm({
         purchaseDate
       });
       sendResponse(res, {
-        status: status8.CREATED,
+        status: status10.CREATED,
         success: true,
         message: "Batch created successfully",
         data
@@ -2658,7 +3271,7 @@ var init_medicineBatch_controller = __esm({
       const sellerId = req.user.id;
       const data = await medicineBatchService.getSellerBatches(sellerId);
       sendResponse(res, {
-        status: status8.OK,
+        status: status10.OK,
         success: true,
         message: "Batches fetched successfully",
         data
@@ -2669,7 +3282,7 @@ var init_medicineBatch_controller = __esm({
       const days = Number(req.query.days ?? 30);
       const data = await medicineBatchService.getExpiringBatches(sellerId, days);
       sendResponse(res, {
-        status: status8.OK,
+        status: status10.OK,
         success: true,
         message: "Expiring batches fetched",
         data
@@ -2679,7 +3292,7 @@ var init_medicineBatch_controller = __esm({
       const sellerId = req.user.id;
       const id = String(req.params.id);
       const data = await medicineBatchService.deleteBatch(id, sellerId);
-      sendResponse(res, { status: status8.OK, success: true, message: "Batch deleted", data });
+      sendResponse(res, { status: status10.OK, success: true, message: "Batch deleted", data });
     });
     medicineBatchController = {
       createBatch: createBatch2,
@@ -2776,7 +3389,7 @@ var init_search_service = __esm({
 });
 
 // src/module/search/search.controller.ts
-import status9 from "http-status";
+import status11 from "http-status";
 var advancedSearch2, getGenericAlternatives2, searchController;
 var init_search_controller = __esm({
   "src/module/search/search.controller.ts"() {
@@ -2788,7 +3401,7 @@ var init_search_controller = __esm({
       const filters = req.query;
       const data = await searchService.advancedSearch(filters);
       sendResponse(res, {
-        status: status9.OK,
+        status: status11.OK,
         success: true,
         message: "Search results fetched",
         data
@@ -2797,7 +3410,7 @@ var init_search_controller = __esm({
     getGenericAlternatives2 = catchAsync(async (req, res) => {
       const id = String(req.params.id);
       const data = await searchService.getGenericAlternatives(id);
-      sendResponse(res, { status: status9.OK, success: true, message: "Generic alternatives fetched", data });
+      sendResponse(res, { status: status11.OK, success: true, message: "Generic alternatives fetched", data });
     });
     searchController = {
       advancedSearch: advancedSearch2,
@@ -2821,7 +3434,7 @@ var init_search_route = __esm({
 });
 
 // src/module/coupon/coupon.service.ts
-import status10 from "http-status";
+import status12 from "http-status";
 var getAllCoupons, applyCoupon, createCoupon, toggleCoupon, deleteCoupon, couponService;
 var init_coupon_service = __esm({
   "src/module/coupon/coupon.service.ts"() {
@@ -2837,21 +3450,21 @@ var init_coupon_service = __esm({
     applyCoupon = async (userId, code, orderTotal) => {
       const coupon = await prisma.coupon.findUnique({ where: { code } });
       if (!coupon || !coupon.isActive)
-        throw new AppError_default(status10.BAD_REQUEST, "Invalid or inactive coupon");
+        throw new AppError_default(status12.BAD_REQUEST, "Invalid or inactive coupon");
       if (coupon.expiresAt && coupon.expiresAt < /* @__PURE__ */ new Date())
-        throw new AppError_default(status10.BAD_REQUEST, "Coupon has expired");
+        throw new AppError_default(status12.BAD_REQUEST, "Coupon has expired");
       if (coupon.usedCount >= coupon.maxUses)
-        throw new AppError_default(status10.BAD_REQUEST, "Coupon usage limit reached");
+        throw new AppError_default(status12.BAD_REQUEST, "Coupon usage limit reached");
       if (orderTotal < coupon.minOrderAmt)
         throw new AppError_default(
-          status10.BAD_REQUEST,
+          status12.BAD_REQUEST,
           `Minimum order amount for this coupon is $${coupon.minOrderAmt}`
         );
       const alreadyUsed = await prisma.couponUsage.findUnique({
         where: { couponId_userId: { couponId: coupon.id, userId } }
       });
       if (alreadyUsed)
-        throw new AppError_default(status10.BAD_REQUEST, "You have already used this coupon");
+        throw new AppError_default(status12.BAD_REQUEST, "You have already used this coupon");
       const discount = coupon.type === "PERCENTAGE" ? orderTotal * coupon.value / 100 : Math.min(coupon.value, orderTotal);
       return {
         coupon,
@@ -2863,7 +3476,7 @@ var init_coupon_service = __esm({
       const code = data.code.trim().toUpperCase();
       const couponType = data.type === "FIXED" ? "FIXED" : "PERCENTAGE";
       const exists = await prisma.coupon.findUnique({ where: { code } });
-      if (exists) throw new AppError_default(status10.CONFLICT, `Coupon code "${code}" already exists`);
+      if (exists) throw new AppError_default(status12.CONFLICT, `Coupon code "${code}" already exists`);
       return prisma.coupon.create({
         data: {
           code,
@@ -2880,12 +3493,12 @@ var init_coupon_service = __esm({
     };
     toggleCoupon = async (id) => {
       const coupon = await prisma.coupon.findUnique({ where: { id } });
-      if (!coupon) throw new AppError_default(status10.NOT_FOUND, "Coupon not found");
+      if (!coupon) throw new AppError_default(status12.NOT_FOUND, "Coupon not found");
       return prisma.coupon.update({ where: { id }, data: { isActive: !coupon.isActive } });
     };
     deleteCoupon = async (id) => {
       const coupon = await prisma.coupon.findUnique({ where: { id } });
-      if (!coupon) throw new AppError_default(status10.NOT_FOUND, "Coupon not found");
+      if (!coupon) throw new AppError_default(status12.NOT_FOUND, "Coupon not found");
       return prisma.coupon.delete({ where: { id } });
     };
     couponService = {
@@ -2899,7 +3512,7 @@ var init_coupon_service = __esm({
 });
 
 // src/module/coupon/coupon.controller.ts
-import status11 from "http-status";
+import status13 from "http-status";
 var getAllCoupons2, createCoupon2, applyCoupon2, toggleCoupon2, deleteCoupon2, couponController;
 var init_coupon_controller = __esm({
   "src/module/coupon/coupon.controller.ts"() {
@@ -2911,14 +3524,14 @@ var init_coupon_controller = __esm({
     getAllCoupons2 = catchAsync(async (req, res) => {
       const sellerId = req.user.role === "SELLER" ? String(req.user.id) : void 0;
       const data = await couponService.getAllCoupons(sellerId);
-      sendResponse(res, { status: status11.OK, success: true, message: "Coupons fetched", data });
+      sendResponse(res, { status: status13.OK, success: true, message: "Coupons fetched", data });
     });
     createCoupon2 = catchAsync(async (req, res) => {
       const { code, type, value, minOrderAmt, maxUses, expiresAt } = req.body;
-      if (!code) throw new AppError_default(status11.BAD_REQUEST, "code is required");
-      if (!type) throw new AppError_default(status11.BAD_REQUEST, "type is required (PERCENTAGE or FIXED)");
+      if (!code) throw new AppError_default(status13.BAD_REQUEST, "code is required");
+      if (!type) throw new AppError_default(status13.BAD_REQUEST, "type is required (PERCENTAGE or FIXED)");
       if (value === void 0 || value === null)
-        throw new AppError_default(status11.BAD_REQUEST, "value is required");
+        throw new AppError_default(status13.BAD_REQUEST, "value is required");
       const sellerId = req.user.role === "SELLER" ? String(req.user.id) : req.body.sellerId;
       const data = await couponService.createCoupon({
         code: String(code),
@@ -2929,26 +3542,26 @@ var init_coupon_controller = __esm({
         ...expiresAt ? { expiresAt: String(expiresAt) } : {},
         ...sellerId ? { sellerId } : {}
       });
-      sendResponse(res, { status: status11.CREATED, success: true, message: "Coupon created", data });
+      sendResponse(res, { status: status13.CREATED, success: true, message: "Coupon created", data });
     });
     applyCoupon2 = catchAsync(async (req, res) => {
       const { code, orderTotal } = req.body;
       if (!code || !orderTotal)
-        throw new AppError_default(status11.BAD_REQUEST, "code and orderTotal are required");
+        throw new AppError_default(status13.BAD_REQUEST, "code and orderTotal are required");
       const data = await couponService.applyCoupon(
         String(req.user.id),
         String(code),
         Number(orderTotal)
       );
-      sendResponse(res, { status: status11.OK, success: true, message: "Coupon applied", data });
+      sendResponse(res, { status: status13.OK, success: true, message: "Coupon applied", data });
     });
     toggleCoupon2 = catchAsync(async (req, res) => {
       const data = await couponService.toggleCoupon(String(req.params.id));
-      sendResponse(res, { status: status11.OK, success: true, message: "Coupon toggled", data });
+      sendResponse(res, { status: status13.OK, success: true, message: "Coupon toggled", data });
     });
     deleteCoupon2 = catchAsync(async (req, res) => {
       await couponService.deleteCoupon(String(req.params.id));
-      sendResponse(res, { status: status11.OK, success: true, message: "Coupon deleted", data: null });
+      sendResponse(res, { status: status13.OK, success: true, message: "Coupon deleted", data: null });
     });
     couponController = {
       getAllCoupons: getAllCoupons2,
@@ -2979,7 +3592,7 @@ var init_coupon_route = __esm({
 });
 
 // src/module/sellerLicense/sellerLicense.service.ts
-import status12 from "http-status";
+import status14 from "http-status";
 var submitLicense, getMyLicense, getAllLicenses, reviewLicense, deleteLicense, sellerLicenseService;
 var init_sellerLicense_service = __esm({
   "src/module/sellerLicense/sellerLicense.service.ts"() {
@@ -3007,7 +3620,7 @@ var init_sellerLicense_service = __esm({
     };
     reviewLicense = async (sellerId, licenseStatus, adminNote) => {
       const license = await prisma.sellerLicense.findUnique({ where: { sellerId } });
-      if (!license) throw new AppError_default(status12.NOT_FOUND, "License not found");
+      if (!license) throw new AppError_default(status14.NOT_FOUND, "License not found");
       return prisma.sellerLicense.update({
         where: { sellerId },
         data: {
@@ -3018,7 +3631,7 @@ var init_sellerLicense_service = __esm({
     };
     deleteLicense = async (licenseId) => {
       const license = await prisma.sellerLicense.findUnique({ where: { id: licenseId } });
-      if (!license) throw new AppError_default(status12.NOT_FOUND, "License not found");
+      if (!license) throw new AppError_default(status14.NOT_FOUND, "License not found");
       return prisma.sellerLicense.delete({ where: { id: licenseId } });
     };
     sellerLicenseService = {
@@ -3032,7 +3645,7 @@ var init_sellerLicense_service = __esm({
 });
 
 // src/module/sellerLicense/sellerLicense.controller.ts
-import status13 from "http-status";
+import status15 from "http-status";
 var submitLicense2, getMyLicense2, getAllLicenses2, reviewLicense2, deleteLicense2, sellerLicenseController;
 var init_sellerLicense_controller = __esm({
   "src/module/sellerLicense/sellerLicense.controller.ts"() {
@@ -3043,44 +3656,171 @@ var init_sellerLicense_controller = __esm({
     init_sellerLicense_service();
     submitLicense2 = catchAsync(async (req, res) => {
       const { licenseNumber, documentUrl } = req.body;
-      if (!licenseNumber || !documentUrl) throw new AppError_default(status13.BAD_REQUEST, "licenseNumber and documentUrl are required");
+      if (!licenseNumber || !documentUrl) throw new AppError_default(status15.BAD_REQUEST, "licenseNumber and documentUrl are required");
       const data = await sellerLicenseService.submitLicense(req.user.id, licenseNumber, documentUrl);
-      sendResponse(res, { status: status13.OK, success: true, message: "License submitted", data });
+      sendResponse(res, { status: status15.OK, success: true, message: "License submitted", data });
     });
     getMyLicense2 = catchAsync(async (req, res) => {
       const data = await sellerLicenseService.getMyLicense(req.user.id);
-      sendResponse(res, { status: status13.OK, success: true, message: "License fetched", data });
+      sendResponse(res, { status: status15.OK, success: true, message: "License fetched", data });
     });
     getAllLicenses2 = catchAsync(async (req, res) => {
       const licenseStatus = req.query.status;
       const data = await sellerLicenseService.getAllLicenses(licenseStatus);
-      sendResponse(res, { status: status13.OK, success: true, message: "All licenses fetched", data });
+      sendResponse(res, { status: status15.OK, success: true, message: "All licenses fetched", data });
     });
     reviewLicense2 = catchAsync(async (req, res) => {
       const sellerId = String(req.params.sellerId);
       const { status: licenseStatus, adminNote } = req.body;
-      if (!licenseStatus) throw new AppError_default(status13.BAD_REQUEST, "status is required");
+      if (!licenseStatus) throw new AppError_default(status15.BAD_REQUEST, "status is required");
       const data = await sellerLicenseService.reviewLicense(sellerId, licenseStatus, adminNote);
-      sendResponse(res, { status: status13.OK, success: true, message: "License reviewed", data });
+      sendResponse(res, { status: status15.OK, success: true, message: "License reviewed", data });
     });
     deleteLicense2 = catchAsync(async (req, res) => {
       const licenseId = String(req.params.licenseId);
       const data = await sellerLicenseService.deleteLicense(licenseId);
-      sendResponse(res, { status: status13.OK, success: true, message: "License deleted", data });
+      sendResponse(res, { status: status15.OK, success: true, message: "License deleted", data });
     });
     sellerLicenseController = { submitLicense: submitLicense2, getMyLicense: getMyLicense2, getAllLicenses: getAllLicenses2, reviewLicense: reviewLicense2, deleteLicense: deleteLicense2 };
   }
 });
 
+// src/lib/cloudinary.ts
+import { v2 as cloudinary } from "cloudinary";
+var cloudinary_default;
+var init_cloudinary = __esm({
+  "src/lib/cloudinary.ts"() {
+    "use strict";
+    cloudinary.config({
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+      api_key: process.env.CLOUDINARY_API_KEY,
+      api_secret: process.env.CLOUDINARY_API_SECRET,
+      secure: true
+    });
+    cloudinary_default = cloudinary;
+  }
+});
+
 // src/module/sellerLicense/sellerLicense.route.ts
 import { Router as Router14 } from "express";
-var router14, sellerLicenseRouter;
+import multer from "multer";
+import https from "https";
+var router14, upload, sellerLicenseRouter;
 var init_sellerLicense_route = __esm({
   "src/module/sellerLicense/sellerLicense.route.ts"() {
     "use strict";
     init_auth_middleware();
     init_sellerLicense_controller();
+    init_prisma();
+    init_cloudinary();
     router14 = Router14();
+    upload = multer({
+      storage: multer.memoryStorage(),
+      limits: { fileSize: 10 * 1024 * 1024 },
+      fileFilter: (_req, file, cb) => {
+        const allowed = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
+        if (allowed.includes(file.mimetype)) cb(null, true);
+        else cb(new Error("Only JPG, PNG, WEBP, or PDF files are allowed"));
+      }
+    });
+    router14.post("/upload", auth_middleware_default(["SELLER"]), (req, res, next) => {
+      upload.single("file")(req, res, async (multerErr) => {
+        if (multerErr) {
+          return res.status(400).json({ success: false, message: multerErr.message || "File upload error" });
+        }
+        try {
+          if (!req.file) {
+            return res.status(400).json({ success: false, message: "No file provided" });
+          }
+          const secureUrl = await new Promise((resolve, reject) => {
+            const stream = cloudinary_default.uploader.upload_stream(
+              {
+                folder: "seller-licenses",
+                resource_type: "image",
+                // image pipeline: works for JPG/PNG/WEBP AND PDF
+                use_filename: true,
+                unique_filename: true,
+                // pages: false tells Cloudinary NOT to split the PDF into pages,
+                // just store the whole file as-is.
+                pages: false
+              },
+              (error, result) => {
+                if (error || !result) {
+                  console.error("[upload] Cloudinary error detail:", error);
+                  return reject(new Error(error?.message || "Cloudinary upload failed"));
+                }
+                console.log("[upload] Cloudinary secure_url:", result.secure_url);
+                resolve(result.secure_url);
+              }
+            );
+            stream.end(req.file.buffer);
+          });
+          return res.status(200).json({
+            success: true,
+            message: "File uploaded successfully",
+            data: { url: secureUrl }
+          });
+        } catch (err) {
+          console.error("[upload] Cloudinary error:", err);
+          return res.status(500).json({ success: false, message: err.message || "Upload failed" });
+        }
+      });
+    });
+    router14.get("/document", auth_middleware_default(["SELLER", "ADMIN"]), async (req, res) => {
+      try {
+        let docUrl = "";
+        if (req.query.url && typeof req.query.url === "string") {
+          docUrl = req.query.url;
+          if (!docUrl.includes("res.cloudinary.com")) {
+            return res.status(400).json({ success: false, message: "Invalid document URL" });
+          }
+        } else {
+          const sellerId = req.user.role === "ADMIN" && req.query.sellerId ? String(req.query.sellerId) : req.user.id;
+          const license = await prisma.sellerLicense.findUnique({ where: { sellerId } });
+          if (!license?.documentUrl) {
+            return res.status(404).json({ success: false, message: "No license document found" });
+          }
+          docUrl = license.documentUrl;
+        }
+        const uploadMarker = "/upload/";
+        const afterUpload = docUrl.split(uploadMarker)[1];
+        if (!afterUpload) {
+          return res.status(400).json({ success: false, message: "Unrecognised document URL format" });
+        }
+        const withoutVersion = afterUpload.replace(/^v\d+\//, "");
+        const lastDot = withoutVersion.lastIndexOf(".");
+        const publicId = lastDot > -1 ? withoutVersion.slice(0, lastDot) : withoutVersion;
+        const format = lastDot > -1 ? withoutVersion.slice(lastDot + 1) : "pdf";
+        const signedUrl = cloudinary_default.utils.private_download_url(publicId, format, {
+          resource_type: "image",
+          type: "upload",
+          attachment: false,
+          expires_at: Math.floor(Date.now() / 1e3) + 3600
+          // valid 1 hour
+        });
+        console.log("[document] fetching signed URL:", signedUrl);
+        https.get(signedUrl, (upstream) => {
+          if (upstream.statusCode && upstream.statusCode >= 400) {
+            console.error("[document] upstream error:", upstream.statusCode);
+            return res.status(502).json({ success: false, message: "Could not fetch document from storage" });
+          }
+          const isPdf = /\.pdf(\?|$)/i.test(docUrl);
+          const contentType = isPdf ? "application/pdf" : upstream.headers["content-type"] || "application/octet-stream";
+          res.setHeader("Content-Type", contentType);
+          res.setHeader("Content-Disposition", 'inline; filename="license.pdf"');
+          res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+          res.setHeader("Pragma", "no-cache");
+          res.setHeader("Expires", "0");
+          upstream.pipe(res);
+        }).on("error", (err) => {
+          console.error("[document] fetch error:", err);
+          res.status(500).json({ success: false, message: "Failed to stream document" });
+        });
+      } catch (err) {
+        console.error("[document] error:", err);
+        return res.status(500).json({ success: false, message: err.message || "Server error" });
+      }
+    });
     router14.post("/", auth_middleware_default(["SELLER"]), sellerLicenseController.submitLicense);
     router14.get("/my", auth_middleware_default(["SELLER"]), sellerLicenseController.getMyLicense);
     router14.get("/", auth_middleware_default(["ADMIN"]), sellerLicenseController.getAllLicenses);
@@ -3091,7 +3831,7 @@ var init_sellerLicense_route = __esm({
 });
 
 // src/module/notification/notification.service.ts
-import status14 from "http-status";
+import status16 from "http-status";
 var createNotification, getMyNotifications, markAsRead, getUnreadCount, getOrderTracking, addTrackingEvent, notificationService;
 var init_notification_service = __esm({
   "src/module/notification/notification.service.ts"() {
@@ -3133,7 +3873,7 @@ var init_notification_service = __esm({
     };
     addTrackingEvent = async (orderId, trackingStatus, note) => {
       const order = await prisma.order.findUnique({ where: { id: orderId } });
-      if (!order) throw new AppError_default(status14.NOT_FOUND, "Order not found");
+      if (!order) throw new AppError_default(status16.NOT_FOUND, "Order not found");
       const event = await prisma.orderTracking.create({
         data: {
           orderId,
@@ -3161,7 +3901,7 @@ var init_notification_service = __esm({
 });
 
 // src/module/notification/notification.controller.ts
-import status15 from "http-status";
+import status17 from "http-status";
 var getMyNotifications2, getUnreadCount2, markAsRead2, getOrderTracking2, addTrackingEvent2, notificationController;
 var init_notification_controller = __esm({
   "src/module/notification/notification.controller.ts"() {
@@ -3172,25 +3912,25 @@ var init_notification_controller = __esm({
     getMyNotifications2 = catchAsync(async (req, res) => {
       const unreadOnly = req.query.unread === "true";
       const data = await notificationService.getMyNotifications(req.user.id, unreadOnly);
-      sendResponse(res, { status: status15.OK, success: true, message: "Notifications fetched", data });
+      sendResponse(res, { status: status17.OK, success: true, message: "Notifications fetched", data });
     });
     getUnreadCount2 = catchAsync(async (req, res) => {
       const data = await notificationService.getUnreadCount(req.user.id);
-      sendResponse(res, { status: status15.OK, success: true, message: "Unread count", data });
+      sendResponse(res, { status: status17.OK, success: true, message: "Unread count", data });
     });
     markAsRead2 = catchAsync(async (req, res) => {
       const id = req.params.id;
       const data = await notificationService.markAsRead(req.user.id, id);
-      sendResponse(res, { status: status15.OK, success: true, message: "Marked as read", data });
+      sendResponse(res, { status: status17.OK, success: true, message: "Marked as read", data });
     });
     getOrderTracking2 = catchAsync(async (req, res) => {
       const data = await notificationService.getOrderTracking(String(req.params.orderId));
-      sendResponse(res, { status: status15.OK, success: true, message: "Tracking fetched", data });
+      sendResponse(res, { status: status17.OK, success: true, message: "Tracking fetched", data });
     });
     addTrackingEvent2 = catchAsync(async (req, res) => {
       const { orderId, status: trackStatus, note } = req.body;
       const data = await notificationService.addTrackingEvent(orderId, trackStatus, note);
-      sendResponse(res, { status: status15.CREATED, success: true, message: "Tracking event added", data });
+      sendResponse(res, { status: status17.CREATED, success: true, message: "Tracking event added", data });
     });
     notificationController = {
       getMyNotifications: getMyNotifications2,
@@ -3222,7 +3962,7 @@ var init_notification_route = __esm({
 });
 
 // src/module/return/return.service.ts
-import status16 from "http-status";
+import status18 from "http-status";
 var submitReturn, getMyReturns, getAllReturns, updateReturnStatus, returnService;
 var init_return_service = __esm({
   "src/module/return/return.service.ts"() {
@@ -3234,10 +3974,10 @@ var init_return_service = __esm({
         where: { id: orderId, userId, status: "DELIVERED" }
       });
       if (!order)
-        throw new AppError_default(status16.BAD_REQUEST, "Only delivered orders can be returned");
+        throw new AppError_default(status18.BAD_REQUEST, "Only delivered orders can be returned");
       const existing = await prisma.returnRequest.findUnique({ where: { orderId } });
       if (existing)
-        throw new AppError_default(status16.CONFLICT, "A return request already exists for this order");
+        throw new AppError_default(status18.CONFLICT, "A return request already exists for this order");
       return prisma.returnRequest.create({
         data: { orderId, userId, reason },
         include: { order: { select: { id: true, status: true, address: true } } }
@@ -3266,7 +4006,7 @@ var init_return_service = __esm({
     };
     updateReturnStatus = async (id, returnStatus, adminNote) => {
       const req = await prisma.returnRequest.findUnique({ where: { id } });
-      if (!req) throw new AppError_default(status16.NOT_FOUND, "Return request not found");
+      if (!req) throw new AppError_default(status18.NOT_FOUND, "Return request not found");
       return prisma.returnRequest.update({
         where: { id },
         data: {
@@ -3285,7 +4025,7 @@ var init_return_service = __esm({
 });
 
 // src/module/return/return.controller.ts
-import status17 from "http-status";
+import status19 from "http-status";
 var submitReturn2, getMyReturns2, getAllReturns2, updateReturnStatus2, returnController;
 var init_return_controller = __esm({
   "src/module/return/return.controller.ts"() {
@@ -3296,25 +4036,25 @@ var init_return_controller = __esm({
     init_return_service();
     submitReturn2 = catchAsync(async (req, res) => {
       const { orderId, reason } = req.body;
-      if (!orderId || !reason) throw new AppError_default(status17.BAD_REQUEST, "orderId and reason are required");
+      if (!orderId || !reason) throw new AppError_default(status19.BAD_REQUEST, "orderId and reason are required");
       const data = await returnService.submitReturn(req.user.id, orderId, reason);
-      sendResponse(res, { status: status17.CREATED, success: true, message: "Return request submitted", data });
+      sendResponse(res, { status: status19.CREATED, success: true, message: "Return request submitted", data });
     });
     getMyReturns2 = catchAsync(async (req, res) => {
       const data = await returnService.getMyReturns(req.user.id);
-      sendResponse(res, { status: status17.OK, success: true, message: "Returns fetched", data });
+      sendResponse(res, { status: status19.OK, success: true, message: "Returns fetched", data });
     });
     getAllReturns2 = catchAsync(async (req, res) => {
       const returnStatus = req.query.status;
       const data = await returnService.getAllReturns(returnStatus);
-      sendResponse(res, { status: status17.OK, success: true, message: "All returns fetched", data });
+      sendResponse(res, { status: status19.OK, success: true, message: "All returns fetched", data });
     });
     updateReturnStatus2 = catchAsync(async (req, res) => {
       const id = String(req.params.id);
       const { status: returnStatus, adminNote } = req.body;
-      if (!returnStatus) throw new AppError_default(status17.BAD_REQUEST, "status is required");
+      if (!returnStatus) throw new AppError_default(status19.BAD_REQUEST, "status is required");
       const data = await returnService.updateReturnStatus(id, returnStatus, adminNote);
-      sendResponse(res, { status: status17.OK, success: true, message: "Return updated", data });
+      sendResponse(res, { status: status19.OK, success: true, message: "Return updated", data });
     });
     returnController = { submitReturn: submitReturn2, getMyReturns: getMyReturns2, getAllReturns: getAllReturns2, updateReturnStatus: updateReturnStatus2 };
   }
@@ -3338,7 +4078,7 @@ var init_return_route = __esm({
 });
 
 // src/module/wishlist/wishlist.service.ts
-import status18 from "http-status";
+import status20 from "http-status";
 var getOrCreate, addItem, removeItem, clearWishlist, wishlistService;
 var init_wishlist_service = __esm({
   "src/module/wishlist/wishlist.service.ts"() {
@@ -3381,7 +4121,7 @@ var init_wishlist_service = __esm({
       const exists = await prisma.wishlistItem.findUnique({
         where: { wishlistId_medicineId: { wishlistId: wishlist.id, medicineId } }
       });
-      if (exists) throw new AppError_default(status18.CONFLICT, "Item already in wishlist");
+      if (exists) throw new AppError_default(status20.CONFLICT, "Item already in wishlist");
       return prisma.wishlistItem.create({
         data: { wishlistId: wishlist.id, medicineId },
         include: {
@@ -3393,11 +4133,11 @@ var init_wishlist_service = __esm({
     };
     removeItem = async (userId, medicineId) => {
       const wishlist = await prisma.wishlist.findUnique({ where: { userId } });
-      if (!wishlist) throw new AppError_default(status18.NOT_FOUND, "Wishlist not found");
+      if (!wishlist) throw new AppError_default(status20.NOT_FOUND, "Wishlist not found");
       const item = await prisma.wishlistItem.findUnique({
         where: { wishlistId_medicineId: { wishlistId: wishlist.id, medicineId } }
       });
-      if (!item) throw new AppError_default(status18.NOT_FOUND, "Item not in wishlist");
+      if (!item) throw new AppError_default(status20.NOT_FOUND, "Item not in wishlist");
       return prisma.wishlistItem.delete({
         where: { wishlistId_medicineId: { wishlistId: wishlist.id, medicineId } }
       });
@@ -3417,7 +4157,7 @@ var init_wishlist_service = __esm({
 });
 
 // src/module/wishlist/wishlist.controller.ts
-import status19 from "http-status";
+import status21 from "http-status";
 var getWishlist, addItem2, removeItem2, clearWishlist2, wishlistController;
 var init_wishlist_controller = __esm({
   "src/module/wishlist/wishlist.controller.ts"() {
@@ -3428,21 +4168,21 @@ var init_wishlist_controller = __esm({
     init_wishlist_service();
     getWishlist = catchAsync(async (req, res) => {
       const data = await wishlistService.getOrCreate(req.user.id);
-      sendResponse(res, { status: status19.OK, success: true, message: "Wishlist fetched", data });
+      sendResponse(res, { status: status21.OK, success: true, message: "Wishlist fetched", data });
     });
     addItem2 = catchAsync(async (req, res) => {
       const { medicineId } = req.body;
-      if (!medicineId) throw new AppError_default(status19.BAD_REQUEST, "medicineId is required");
+      if (!medicineId) throw new AppError_default(status21.BAD_REQUEST, "medicineId is required");
       const data = await wishlistService.addItem(req.user.id, medicineId);
-      sendResponse(res, { status: status19.CREATED, success: true, message: "Added to wishlist", data });
+      sendResponse(res, { status: status21.CREATED, success: true, message: "Added to wishlist", data });
     });
     removeItem2 = catchAsync(async (req, res) => {
       const data = await wishlistService.removeItem(req.user.id, String(req.params.medicineId));
-      sendResponse(res, { status: status19.OK, success: true, message: "Removed from wishlist", data });
+      sendResponse(res, { status: status21.OK, success: true, message: "Removed from wishlist", data });
     });
     clearWishlist2 = catchAsync(async (req, res) => {
       await wishlistService.clearWishlist(req.user.id);
-      sendResponse(res, { status: status19.OK, success: true, message: "Wishlist cleared", data: null });
+      sendResponse(res, { status: status21.OK, success: true, message: "Wishlist cleared", data: null });
     });
     wishlistController = { getWishlist, addItem: addItem2, removeItem: removeItem2, clearWishlist: clearWishlist2 };
   }
@@ -3465,68 +4205,8 @@ var init_wishlist_route = __esm({
   }
 });
 
-// src/module/subOrder/subOrder.service.ts
-import status20 from "http-status";
-var getSellerSubOrders, getOrderSubOrders, updateSubOrderStatus, subOrderService;
-var init_subOrder_service = __esm({
-  "src/module/subOrder/subOrder.service.ts"() {
-    "use strict";
-    init_prisma();
-    init_AppError();
-    getSellerSubOrders = async (sellerId) => {
-      return prisma.subOrder.findMany({
-        where: { sellerId },
-        include: {
-          order: {
-            select: {
-              id: true,
-              address: true,
-              createdAt: true,
-              user: { select: { name: true, email: true } }
-            }
-          },
-          items: {
-            include: {
-              medicine: { select: { id: true, name: true, price: true, image: true } }
-            }
-          }
-        },
-        orderBy: { createdAt: "desc" }
-      });
-    };
-    getOrderSubOrders = async (orderId, userId) => {
-      const order = await prisma.order.findFirst({ where: { id: orderId, userId } });
-      if (!order) throw new AppError_default(status20.NOT_FOUND, "Order not found");
-      return prisma.subOrder.findMany({
-        where: { orderId },
-        include: {
-          seller: { select: { name: true, email: true } },
-          items: {
-            include: {
-              medicine: { select: { id: true, name: true, price: true, image: true } }
-            }
-          }
-        }
-      });
-    };
-    updateSubOrderStatus = async (id, sellerId, orderStatus) => {
-      const sub = await prisma.subOrder.findFirst({ where: { id, sellerId } });
-      if (!sub) throw new AppError_default(status20.NOT_FOUND, "Sub-order not found");
-      return prisma.subOrder.update({
-        where: { id },
-        data: { status: orderStatus }
-      });
-    };
-    subOrderService = {
-      getSellerSubOrders,
-      getOrderSubOrders,
-      updateSubOrderStatus
-    };
-  }
-});
-
 // src/module/subOrder/subOrder.controller.ts
-import status21 from "http-status";
+import status22 from "http-status";
 var getSellerSubOrders2, getOrderSubOrders2, updateSubOrderStatus2, subOrderController;
 var init_subOrder_controller = __esm({
   "src/module/subOrder/subOrder.controller.ts"() {
@@ -3536,16 +4216,16 @@ var init_subOrder_controller = __esm({
     init_subOrder_service();
     getSellerSubOrders2 = catchAsync(async (req, res) => {
       const data = await subOrderService.getSellerSubOrders(req.user.id);
-      sendResponse(res, { status: status21.OK, success: true, message: "Sub-orders fetched", data });
+      sendResponse(res, { status: status22.OK, success: true, message: "Sub-orders fetched", data });
     });
     getOrderSubOrders2 = catchAsync(async (req, res) => {
       const data = await subOrderService.getOrderSubOrders(String(req.params.orderId), req.user.id);
-      sendResponse(res, { status: status21.OK, success: true, message: "Order sub-orders fetched", data });
+      sendResponse(res, { status: status22.OK, success: true, message: "Order sub-orders fetched", data });
     });
     updateSubOrderStatus2 = catchAsync(async (req, res) => {
       const { status: orderStatus } = req.body;
       const data = await subOrderService.updateSubOrderStatus(String(req.params.id), req.user.id, orderStatus);
-      sendResponse(res, { status: status21.OK, success: true, message: "Sub-order updated", data });
+      sendResponse(res, { status: status22.OK, success: true, message: "Sub-order updated", data });
     });
     subOrderController = { getSellerSubOrders: getSellerSubOrders2, getOrderSubOrders: getOrderSubOrders2, updateSubOrderStatus: updateSubOrderStatus2 };
   }
@@ -3569,7 +4249,7 @@ var init_subOrder_route = __esm({
 
 // src/module/banner/banner.route.ts
 import { Router as Router19 } from "express";
-import status22 from "http-status";
+import status23 from "http-status";
 var router19, bannerRouter;
 var init_banner_route = __esm({
   "src/module/banner/banner.route.ts"() {
@@ -3586,15 +4266,15 @@ var init_banner_route = __esm({
         where: isActive !== void 0 ? { isActive } : {},
         orderBy: { sortOrder: "asc" }
       });
-      sendResponse(res, { status: status22.OK, success: true, message: "Banners fetched", data: banners });
+      sendResponse(res, { status: status23.OK, success: true, message: "Banners fetched", data: banners });
     }));
     router19.post("/", auth_middleware_default(["ADMIN"]), catchAsync(async (req, res) => {
       const { title, subtitle, badge, color, textColor, icon, imageUrl, link, isActive, sortOrder } = req.body;
-      if (!title) throw new AppError_default(status22.BAD_REQUEST, "title is required");
+      if (!title) throw new AppError_default(status23.BAD_REQUEST, "title is required");
       const banner = await prisma.banner.create({
         data: { title, subtitle, badge, color: color || "#1B3A5C", textColor: textColor || "#FFFFFF", icon, imageUrl, link, isActive: isActive ?? true, sortOrder: Number(sortOrder) || 0 }
       });
-      sendResponse(res, { status: status22.CREATED, success: true, message: "Banner created", data: banner });
+      sendResponse(res, { status: status23.CREATED, success: true, message: "Banner created", data: banner });
     }));
     router19.put("/:id", auth_middleware_default(["ADMIN"]), catchAsync(async (req, res) => {
       const { title, subtitle, badge, color, textColor, icon, imageUrl, link, isActive, sortOrder } = req.body;
@@ -3602,11 +4282,11 @@ var init_banner_route = __esm({
         where: { id: req.params.id },
         data: { title, subtitle, badge, color, textColor, icon, imageUrl, link, isActive, sortOrder: sortOrder !== void 0 ? Number(sortOrder) : void 0 }
       });
-      sendResponse(res, { status: status22.OK, success: true, message: "Banner updated", data: banner });
+      sendResponse(res, { status: status23.OK, success: true, message: "Banner updated", data: banner });
     }));
     router19.delete("/:id", auth_middleware_default(["ADMIN"]), catchAsync(async (req, res) => {
       await prisma.banner.delete({ where: { id: req.params.id } });
-      sendResponse(res, { status: status22.OK, success: true, message: "Banner deleted", data: null });
+      sendResponse(res, { status: status23.OK, success: true, message: "Banner deleted", data: null });
     }));
     bannerRouter = router19;
   }
@@ -3614,7 +4294,7 @@ var init_banner_route = __esm({
 
 // src/module/platformFeature/platformFeature.route.ts
 import { Router as Router20 } from "express";
-import status23 from "http-status";
+import status24 from "http-status";
 var router20, platformFeatureRouter;
 var init_platformFeature_route = __esm({
   "src/module/platformFeature/platformFeature.route.ts"() {
@@ -3631,15 +4311,15 @@ var init_platformFeature_route = __esm({
         where: isActive !== void 0 ? { isActive } : {},
         orderBy: { sortOrder: "asc" }
       });
-      sendResponse(res, { status: status23.OK, success: true, message: "Features fetched", data: features });
+      sendResponse(res, { status: status24.OK, success: true, message: "Features fetched", data: features });
     }));
     router20.post("/", auth_middleware_default(["ADMIN"]), catchAsync(async (req, res) => {
       const { title, description, icon, isActive, sortOrder } = req.body;
-      if (!title || !description || !icon) throw new AppError_default(status23.BAD_REQUEST, "title, description, icon required");
+      if (!title || !description || !icon) throw new AppError_default(status24.BAD_REQUEST, "title, description, icon required");
       const feat = await prisma.platformFeature.create({
         data: { title, description, icon, isActive: isActive ?? true, sortOrder: Number(sortOrder) || 0 }
       });
-      sendResponse(res, { status: status23.CREATED, success: true, message: "Feature created", data: feat });
+      sendResponse(res, { status: status24.CREATED, success: true, message: "Feature created", data: feat });
     }));
     router20.put("/:id", auth_middleware_default(["ADMIN"]), catchAsync(async (req, res) => {
       const { title, description, icon, isActive, sortOrder } = req.body;
@@ -3647,11 +4327,11 @@ var init_platformFeature_route = __esm({
         where: { id: req.params.id },
         data: { title, description, icon, isActive, sortOrder: sortOrder !== void 0 ? Number(sortOrder) : void 0 }
       });
-      sendResponse(res, { status: status23.OK, success: true, message: "Feature updated", data: feat });
+      sendResponse(res, { status: status24.OK, success: true, message: "Feature updated", data: feat });
     }));
     router20.delete("/:id", auth_middleware_default(["ADMIN"]), catchAsync(async (req, res) => {
       await prisma.platformFeature.delete({ where: { id: req.params.id } });
-      sendResponse(res, { status: status23.OK, success: true, message: "Feature deleted", data: null });
+      sendResponse(res, { status: status24.OK, success: true, message: "Feature deleted", data: null });
     }));
     platformFeatureRouter = router20;
   }
@@ -3659,7 +4339,7 @@ var init_platformFeature_route = __esm({
 
 // src/module/flashSale/flashSale.route.ts
 import { Router as Router21 } from "express";
-import status24 from "http-status";
+import status25 from "http-status";
 var router21, flashSaleRouter;
 var init_flashSale_route = __esm({
   "src/module/flashSale/flashSale.route.ts"() {
@@ -3680,7 +4360,7 @@ var init_flashSale_route = __esm({
         },
         orderBy: { endAt: "asc" }
       });
-      sendResponse(res, { status: status24.OK, success: true, message: "Active flash sales", data: sales });
+      sendResponse(res, { status: status25.OK, success: true, message: "Active flash sales", data: sales });
     }));
     router21.get("/my", auth_middleware_default(["SELLER"]), catchAsync(async (req, res) => {
       const sales = await prisma.flashSale.findMany({
@@ -3688,15 +4368,34 @@ var init_flashSale_route = __esm({
         include: { medicine: { select: { id: true, name: true, image: true, price: true } } },
         orderBy: { createdAt: "desc" }
       });
-      sendResponse(res, { status: status24.OK, success: true, message: "My flash sales", data: sales });
+      sendResponse(res, { status: status25.OK, success: true, message: "My flash sales", data: sales });
     }));
     router21.post("/", auth_middleware_default(["SELLER"]), catchAsync(async (req, res) => {
+      const license = await prisma.sellerLicense.findUnique({ where: { sellerId: req.user.id } });
+      if (!license || license.status !== "VERIFIED") {
+        throw new AppError_default(
+          status25.FORBIDDEN,
+          "Your seller license must be approved (VERIFIED) by an admin before you can create flash sales."
+        );
+      }
       const { medicineId, discountPrice, saleStock, startAt, endAt } = req.body;
       if (!medicineId || !discountPrice || !saleStock || !startAt || !endAt)
-        throw new AppError_default(status24.BAD_REQUEST, "medicineId, discountPrice, saleStock, startAt, endAt required");
+        throw new AppError_default(status25.BAD_REQUEST, "medicineId, discountPrice, saleStock, startAt, endAt required");
       const medicine = await prisma.medicine.findUnique({ where: { id: medicineId } });
-      if (!medicine) throw new AppError_default(status24.NOT_FOUND, "Medicine not found");
-      if (medicine.sellerId !== req.user.id) throw new AppError_default(status24.FORBIDDEN, "Not your medicine");
+      if (!medicine) throw new AppError_default(status25.NOT_FOUND, "Medicine not found");
+      if (medicine.sellerId !== req.user.id) throw new AppError_default(status25.FORBIDDEN, "Not your medicine");
+      if (Number(saleStock) > medicine.stock) {
+        throw new AppError_default(
+          status25.BAD_REQUEST,
+          `Flash sale stock (${saleStock}) cannot exceed the medicine's total available stock (${medicine.stock}).`
+        );
+      }
+      if (Number(discountPrice) >= medicine.price) {
+        throw new AppError_default(
+          status25.BAD_REQUEST,
+          `Discount price (${discountPrice}) must be lower than the original price (${medicine.price}).`
+        );
+      }
       const sale = await prisma.flashSale.create({
         data: {
           medicineId,
@@ -3709,14 +4408,20 @@ var init_flashSale_route = __esm({
         },
         include: { medicine: { select: { id: true, name: true, image: true, price: true } } }
       });
-      sendResponse(res, { status: status24.CREATED, success: true, message: "Flash sale submitted for approval", data: sale });
+      sendResponse(res, { status: status25.CREATED, success: true, message: "Flash sale submitted for approval", data: sale });
+    }));
+    router21.delete("/admin/:id", auth_middleware_default(["ADMIN"]), catchAsync(async (req, res) => {
+      const sale = await prisma.flashSale.findUnique({ where: { id: req.params.id } });
+      if (!sale) throw new AppError_default(status25.NOT_FOUND, "Flash sale not found");
+      await prisma.flashSale.delete({ where: { id: req.params.id } });
+      sendResponse(res, { status: status25.OK, success: true, message: "Flash sale removed", data: null });
     }));
     router21.delete("/:id", auth_middleware_default(["SELLER"]), catchAsync(async (req, res) => {
       const sale = await prisma.flashSale.findUnique({ where: { id: req.params.id } });
-      if (!sale) throw new AppError_default(status24.NOT_FOUND, "Flash sale not found");
-      if (sale.sellerId !== req.user.id) throw new AppError_default(status24.FORBIDDEN, "Forbidden");
+      if (!sale) throw new AppError_default(status25.NOT_FOUND, "Flash sale not found");
+      if (sale.sellerId !== req.user.id) throw new AppError_default(status25.FORBIDDEN, "Forbidden");
       await prisma.flashSale.delete({ where: { id: req.params.id } });
-      sendResponse(res, { status: status24.OK, success: true, message: "Flash sale cancelled", data: null });
+      sendResponse(res, { status: status25.OK, success: true, message: "Flash sale cancelled", data: null });
     }));
     router21.get("/admin/all", auth_middleware_default(["ADMIN"]), catchAsync(async (req, res) => {
       const sales = await prisma.flashSale.findMany({
@@ -3726,7 +4431,7 @@ var init_flashSale_route = __esm({
         },
         orderBy: { createdAt: "desc" }
       });
-      sendResponse(res, { status: status24.OK, success: true, message: "All flash sales", data: sales });
+      sendResponse(res, { status: status25.OK, success: true, message: "All flash sales", data: sales });
     }));
     router21.patch("/admin/:id", auth_middleware_default(["ADMIN"]), catchAsync(async (req, res) => {
       const { isApproved, adminNote } = req.body;
@@ -3735,7 +4440,7 @@ var init_flashSale_route = __esm({
         data: { isApproved, adminNote },
         include: { medicine: { select: { id: true, name: true } } }
       });
-      sendResponse(res, { status: status24.OK, success: true, message: `Flash sale ${isApproved ? "approved" : "rejected"}`, data: sale });
+      sendResponse(res, { status: status25.OK, success: true, message: `Flash sale ${isApproved ? "approved" : "rejected"}`, data: sale });
     }));
     flashSaleRouter = router21;
   }
@@ -3743,7 +4448,7 @@ var init_flashSale_route = __esm({
 
 // src/module/blog/blog.route.ts
 import { Router as Router22 } from "express";
-import status25 from "http-status";
+import status26 from "http-status";
 var makeSlug, router22, blogRouter;
 var init_blog_route = __esm({
   "src/module/blog/blog.route.ts"() {
@@ -3763,21 +4468,21 @@ var init_blog_route = __esm({
         orderBy: { publishedAt: "desc" },
         take: limit
       });
-      sendResponse(res, { status: status25.OK, success: true, message: "Blogs fetched", data: blogs });
+      sendResponse(res, { status: status26.OK, success: true, message: "Blogs fetched", data: blogs });
     }));
     router22.get("/my/list", auth_middleware_default(), catchAsync(async (req, res) => {
       const blogs = await prisma.blog.findMany({
         where: { userId: req.user.id },
         orderBy: { createdAt: "desc" }
       });
-      sendResponse(res, { status: status25.OK, success: true, message: "My blogs", data: blogs });
+      sendResponse(res, { status: status26.OK, success: true, message: "My blogs", data: blogs });
     }));
     router22.get("/admin/all", auth_middleware_default(["ADMIN"]), catchAsync(async (req, res) => {
       const blogs = await prisma.blog.findMany({
         include: { author: { select: { id: true, name: true, image: true } } },
         orderBy: { createdAt: "desc" }
       });
-      sendResponse(res, { status: status25.OK, success: true, message: "All blogs", data: blogs });
+      sendResponse(res, { status: status26.OK, success: true, message: "All blogs", data: blogs });
     }));
     router22.get("/:slug", catchAsync(async (req, res) => {
       const blog = await prisma.blog.findUnique({
@@ -3785,14 +4490,14 @@ var init_blog_route = __esm({
         include: { author: { select: { id: true, name: true, image: true } } }
       });
       if (!blog || !blog.isPublished) {
-        return sendResponse(res, { status: status25.NOT_FOUND, success: false, message: "Blog not found", data: null });
+        return sendResponse(res, { status: status26.NOT_FOUND, success: false, message: "Blog not found", data: null });
       }
-      sendResponse(res, { status: status25.OK, success: true, message: "Blog fetched", data: blog });
+      sendResponse(res, { status: status26.OK, success: true, message: "Blog fetched", data: blog });
     }));
     router22.post("/", auth_middleware_default(), catchAsync(async (req, res) => {
       const { title, summary, content, image, tags } = req.body;
       if (!title || !summary || !content) {
-        return sendResponse(res, { status: status25.BAD_REQUEST, success: false, message: "title, summary, content required", data: null });
+        return sendResponse(res, { status: status26.BAD_REQUEST, success: false, message: "title, summary, content required", data: null });
       }
       const baseSlug = makeSlug(title);
       let slug = baseSlug;
@@ -3812,17 +4517,17 @@ var init_blog_route = __esm({
         },
         include: { author: { select: { id: true, name: true, image: true } } }
       });
-      sendResponse(res, { status: status25.CREATED, success: true, message: "Blog submitted for review", data: blog });
+      sendResponse(res, { status: status26.CREATED, success: true, message: "Blog submitted for review", data: blog });
     }));
     router22.put("/:id", auth_middleware_default(), catchAsync(async (req, res) => {
       const { id } = req.params;
       const { title, summary, content, image, tags } = req.body;
       const existing = await prisma.blog.findUnique({ where: { id } });
       if (!existing) {
-        return sendResponse(res, { status: status25.NOT_FOUND, success: false, message: "Blog not found", data: null });
+        return sendResponse(res, { status: status26.NOT_FOUND, success: false, message: "Blog not found", data: null });
       }
       if (existing.userId !== req.user.id && req.user.role !== "ADMIN") {
-        return sendResponse(res, { status: status25.FORBIDDEN, success: false, message: "Not authorized to edit this blog", data: null });
+        return sendResponse(res, { status: status26.FORBIDDEN, success: false, message: "Not authorized to edit this blog", data: null });
       }
       const shouldReset = req.user.role !== "ADMIN";
       let slug = existing.slug;
@@ -3846,7 +4551,7 @@ var init_blog_route = __esm({
         },
         include: { author: { select: { id: true, name: true, image: true } } }
       });
-      sendResponse(res, { status: status25.OK, success: true, message: shouldReset ? "Blog updated \u2014 pending admin review" : "Blog updated", data: blog });
+      sendResponse(res, { status: status26.OK, success: true, message: shouldReset ? "Blog updated \u2014 pending admin review" : "Blog updated", data: blog });
     }));
     router22.patch("/admin/:id", auth_middleware_default(["ADMIN"]), catchAsync(async (req, res) => {
       const { isPublished, isFeatured } = req.body;
@@ -3858,11 +4563,11 @@ var init_blog_route = __esm({
         },
         include: { author: { select: { id: true, name: true, image: true } } }
       });
-      sendResponse(res, { status: status25.OK, success: true, message: "Blog updated", data: blog });
+      sendResponse(res, { status: status26.OK, success: true, message: "Blog updated", data: blog });
     }));
     router22.delete("/admin/:id", auth_middleware_default(["ADMIN"]), catchAsync(async (req, res) => {
       await prisma.blog.delete({ where: { id: req.params.id } });
-      sendResponse(res, { status: status25.OK, success: true, message: "Blog deleted", data: null });
+      sendResponse(res, { status: status26.OK, success: true, message: "Blog deleted", data: null });
     }));
     blogRouter = router22;
   }
@@ -3870,7 +4575,7 @@ var init_blog_route = __esm({
 
 // src/module/testimonial/testimonial.route.ts
 import { Router as Router23 } from "express";
-import status26 from "http-status";
+import status27 from "http-status";
 var router23, testimonialRouter;
 var init_testimonial_route = __esm({
   "src/module/testimonial/testimonial.route.ts"() {
@@ -3893,23 +4598,23 @@ var init_testimonial_route = __esm({
         orderBy: { createdAt: "desc" },
         take: limit
       });
-      sendResponse(res, { status: status26.OK, success: true, message: "Testimonials fetched", data: testimonials });
+      sendResponse(res, { status: status27.OK, success: true, message: "Testimonials fetched", data: testimonials });
     }));
     router23.post("/", auth_middleware_default(), catchAsync(async (req, res) => {
       const { content, rating } = req.body;
-      if (!content) return sendResponse(res, { status: status26.BAD_REQUEST, success: false, message: "content required", data: null });
+      if (!content) return sendResponse(res, { status: status27.BAD_REQUEST, success: false, message: "content required", data: null });
       const t = await prisma.testimonial.create({
         data: { userId: req.user.id, content, rating: Math.min(5, Math.max(1, Number(rating) || 5)) },
         include: { user: { select: { id: true, name: true, image: true } } }
       });
-      sendResponse(res, { status: status26.CREATED, success: true, message: "Testimonial submitted for review", data: t });
+      sendResponse(res, { status: status27.CREATED, success: true, message: "Testimonial submitted for review", data: t });
     }));
     router23.get("/admin/all", auth_middleware_default(["ADMIN"]), catchAsync(async (req, res) => {
       const testimonials = await prisma.testimonial.findMany({
         include: { user: { select: { id: true, name: true, image: true } } },
         orderBy: { createdAt: "desc" }
       });
-      sendResponse(res, { status: status26.OK, success: true, message: "All testimonials", data: testimonials });
+      sendResponse(res, { status: status27.OK, success: true, message: "All testimonials", data: testimonials });
     }));
     router23.patch("/admin/:id", auth_middleware_default(["ADMIN"]), catchAsync(async (req, res) => {
       const { isApproved, isFeatured } = req.body;
@@ -3921,11 +4626,11 @@ var init_testimonial_route = __esm({
         },
         include: { user: { select: { id: true, name: true, image: true } } }
       });
-      sendResponse(res, { status: status26.OK, success: true, message: "Testimonial updated", data: t });
+      sendResponse(res, { status: status27.OK, success: true, message: "Testimonial updated", data: t });
     }));
     router23.delete("/admin/:id", auth_middleware_default(["ADMIN"]), catchAsync(async (req, res) => {
       await prisma.testimonial.delete({ where: { id: req.params.id } });
-      sendResponse(res, { status: status26.OK, success: true, message: "Testimonial deleted", data: null });
+      sendResponse(res, { status: status27.OK, success: true, message: "Testimonial deleted", data: null });
     }));
     testimonialRouter = router23;
   }
@@ -3933,7 +4638,7 @@ var init_testimonial_route = __esm({
 
 // src/module/newsletter/newsletter.route.ts
 import { Router as Router24 } from "express";
-import status27 from "http-status";
+import status28 from "http-status";
 var router24, newsletterRouter;
 var init_newsletter_route = __esm({
   "src/module/newsletter/newsletter.route.ts"() {
@@ -3946,20 +4651,20 @@ var init_newsletter_route = __esm({
     router24.post("/subscribe", catchAsync(async (req, res) => {
       const { email, name } = req.body;
       if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
-        return sendResponse(res, { status: status27.BAD_REQUEST, success: false, message: "Valid email required", data: null });
+        return sendResponse(res, { status: status28.BAD_REQUEST, success: false, message: "Valid email required", data: null });
       const existing = await prisma.newsletterSubscriber.findUnique({ where: { email } });
       if (existing)
-        return sendResponse(res, { status: status27.CONFLICT, success: false, message: "Already subscribed", data: null });
+        return sendResponse(res, { status: status28.CONFLICT, success: false, message: "Already subscribed", data: null });
       const sub = await prisma.newsletterSubscriber.create({ data: { email, name } });
-      sendResponse(res, { status: status27.CREATED, success: true, message: "Subscribed successfully", data: sub });
+      sendResponse(res, { status: status28.CREATED, success: true, message: "Subscribed successfully", data: sub });
     }));
     router24.get("/", auth_middleware_default(["ADMIN"]), catchAsync(async (req, res) => {
       const subscribers = await prisma.newsletterSubscriber.findMany({ orderBy: { subscribedAt: "desc" } });
-      sendResponse(res, { status: status27.OK, success: true, message: "Subscribers fetched", data: subscribers });
+      sendResponse(res, { status: status28.OK, success: true, message: "Subscribers fetched", data: subscribers });
     }));
     router24.delete("/:id", auth_middleware_default(["ADMIN"]), catchAsync(async (req, res) => {
       await prisma.newsletterSubscriber.delete({ where: { id: req.params.id } });
-      sendResponse(res, { status: status27.OK, success: true, message: "Subscriber removed", data: null });
+      sendResponse(res, { status: status28.OK, success: true, message: "Subscriber removed", data: null });
     }));
     newsletterRouter = router24;
   }
@@ -4005,7 +4710,7 @@ var init_payment_route = __esm({
 
 // src/module/contact/contact.route.ts
 import { Router as Router26 } from "express";
-import status28 from "http-status";
+import status29 from "http-status";
 var router26, contactRouter;
 var init_contact_route = __esm({
   "src/module/contact/contact.route.ts"() {
@@ -4019,11 +4724,19 @@ var init_contact_route = __esm({
     router26.post("/", catchAsync(async (req, res) => {
       const { name, email, subject, message } = req.body;
       if (!name || !email || !message)
-        throw new AppError_default(status28.BAD_REQUEST, "name, email, message are required");
+        throw new AppError_default(status29.BAD_REQUEST, "name, email, message are required");
       const msg = await prisma.contactMessage.create({
         data: { name, email, subject: subject || null, message }
       });
-      sendResponse(res, { status: status28.CREATED, success: true, message: "Message sent successfully", data: msg });
+      sendResponse(res, { status: status29.CREATED, success: true, message: "Message sent successfully", data: msg });
+    }));
+    router26.get("/my", auth_middleware_default(["CUSTOMER"]), catchAsync(async (req, res) => {
+      const email = req.user.email;
+      const messages = await prisma.contactMessage.findMany({
+        where: { email },
+        orderBy: { createdAt: "desc" }
+      });
+      sendResponse(res, { status: status29.OK, success: true, message: "Your tickets fetched", data: messages });
     }));
     router26.get("/admin/messages", auth_middleware_default(["ADMIN"]), catchAsync(async (req, res) => {
       const statusFilter = req.query.status;
@@ -4031,23 +4744,23 @@ var init_contact_route = __esm({
         where: statusFilter ? { status: statusFilter } : void 0,
         orderBy: { createdAt: "desc" }
       });
-      sendResponse(res, { status: status28.OK, success: true, message: "Messages fetched", data: messages });
+      sendResponse(res, { status: status29.OK, success: true, message: "Messages fetched", data: messages });
     }));
     router26.patch("/admin/:id/status", auth_middleware_default(["ADMIN"]), catchAsync(async (req, res) => {
       const { status: newStatus } = req.body;
       if (!["UNREAD", "READ", "ARCHIVED"].includes(newStatus))
-        throw new AppError_default(status28.BAD_REQUEST, "Invalid status");
+        throw new AppError_default(status29.BAD_REQUEST, "Invalid status");
       const msg = await prisma.contactMessage.update({
         where: { id: req.params.id },
         data: { status: newStatus }
       });
-      sendResponse(res, { status: status28.OK, success: true, message: "Status updated", data: msg });
+      sendResponse(res, { status: status29.OK, success: true, message: "Status updated", data: msg });
     }));
     router26.post("/admin/:id/reply", auth_middleware_default(["ADMIN"]), catchAsync(async (req, res) => {
       const { reply } = req.body;
-      if (!reply) throw new AppError_default(status28.BAD_REQUEST, "reply text required");
+      if (!reply) throw new AppError_default(status29.BAD_REQUEST, "reply text required");
       const msg = await prisma.contactMessage.findUnique({ where: { id: req.params.id } });
-      if (!msg) throw new AppError_default(status28.NOT_FOUND, "Message not found");
+      if (!msg) throw new AppError_default(status29.NOT_FOUND, "Message not found");
       const updated = await prisma.contactMessage.update({
         where: { id: req.params.id },
         data: { adminReply: reply, repliedAt: /* @__PURE__ */ new Date(), status: "READ" }
@@ -4088,11 +4801,11 @@ var init_contact_route = __esm({
       } catch (emailErr) {
         console.error("Email send failed (reply stored anyway):", emailErr);
       }
-      sendResponse(res, { status: status28.OK, success: true, message: "Reply sent and stored", data: updated });
+      sendResponse(res, { status: status29.OK, success: true, message: "Reply sent and stored", data: updated });
     }));
     router26.delete("/admin/:id", auth_middleware_default(["ADMIN"]), catchAsync(async (req, res) => {
       await prisma.contactMessage.delete({ where: { id: req.params.id } });
-      sendResponse(res, { status: status28.OK, success: true, message: "Message deleted", data: null });
+      sendResponse(res, { status: status29.OK, success: true, message: "Message deleted", data: null });
     }));
     contactRouter = router26;
   }
@@ -4100,7 +4813,7 @@ var init_contact_route = __esm({
 
 // src/config/env.ts
 import dotenv from "dotenv";
-import status29 from "http-status";
+import status30 from "http-status";
 var loadEnvVariables, envVars;
 var init_env = __esm({
   "src/config/env.ts"() {
@@ -4122,7 +4835,7 @@ var init_env = __esm({
       ];
       requireEnvVariable.forEach((variable) => {
         if (!process.env[variable]) {
-          throw new AppError_default(status29.INTERNAL_SERVER_ERROR, `Environment variable ${variable} is required but not set in .env file.`);
+          throw new AppError_default(status30.INTERNAL_SERVER_ERROR, `Environment variable ${variable} is required but not set in .env file.`);
         }
       });
       return {
@@ -4144,15 +4857,15 @@ var init_env = __esm({
 });
 
 // src/config/cloudinary.config.ts
-import { v2 as cloudinary } from "cloudinary";
-import status30 from "http-status";
+import { v2 as cloudinary2 } from "cloudinary";
+import status31 from "http-status";
 var deleteFileFromCloudinary;
 var init_cloudinary_config = __esm({
   "src/config/cloudinary.config.ts"() {
     "use strict";
     init_AppError();
     init_env();
-    cloudinary.config({
+    cloudinary2.config({
       cloud_name: envVars.CLOUDINARY.CLOUDINARY_CLOUD_NAME,
       api_key: envVars.CLOUDINARY.CLOUDINARY_API_KEY,
       api_secret: envVars.CLOUDINARY.CLOUDINARY_API_SECRET
@@ -4165,7 +4878,7 @@ var init_cloudinary_config = __esm({
           const publicId = match[1];
           const isRaw = url.includes("/raw/upload/");
           const resourceType = isRaw ? "raw" : "image";
-          await cloudinary.uploader.destroy(
+          await cloudinary2.uploader.destroy(
             publicId,
             {
               resource_type: resourceType
@@ -4174,20 +4887,20 @@ var init_cloudinary_config = __esm({
         }
       } catch (error) {
         console.error("Error deleting file from Cloudinary:", error);
-        throw new AppError_default(status30.INTERNAL_SERVER_ERROR, "Failed to delete file from Cloudinary");
+        throw new AppError_default(status31.INTERNAL_SERVER_ERROR, "Failed to delete file from Cloudinary");
       }
     };
   }
 });
 
 // src/errorHelpers/handleZodError.ts
-import status31 from "http-status";
+import status32 from "http-status";
 var handleZodError;
 var init_handleZodError = __esm({
   "src/errorHelpers/handleZodError.ts"() {
     "use strict";
     handleZodError = (err) => {
-      const statusCode = status31.BAD_REQUEST;
+      const statusCode = status32.BAD_REQUEST;
       const message = "Zod Validation Error";
       const errorSources = [];
       err.issues.forEach((issue) => {
@@ -4207,7 +4920,7 @@ var init_handleZodError = __esm({
 });
 
 // src/middleware/globalErrorHandler.ts
-import status32 from "http-status";
+import status33 from "http-status";
 import z4 from "zod";
 var globalErrorHandler;
 var init_globalErrorHandler = __esm({
@@ -4229,7 +4942,7 @@ var init_globalErrorHandler = __esm({
         await Promise.all(imageUrls.map((url) => deleteFileFromCloudinary(url)));
       }
       let errorSources = [];
-      let statusCode = status32.INTERNAL_SERVER_ERROR;
+      let statusCode = status33.INTERNAL_SERVER_ERROR;
       let message = "Internal Server Error";
       let stack = void 0;
       if (err instanceof z4.ZodError) {
@@ -4249,7 +4962,7 @@ var init_globalErrorHandler = __esm({
           }
         ];
       } else if (err instanceof Error) {
-        statusCode = status32.INTERNAL_SERVER_ERROR;
+        statusCode = status33.INTERNAL_SERVER_ERROR;
         message = err.message;
         stack = err.stack;
         errorSources = [
@@ -4921,8 +5634,1614 @@ var init_chatbot_route = __esm({
   }
 });
 
-// src/app.ts
+// src/module/warehouse/warehouse.service.ts
+import status34 from "http-status";
+var haversine, createWarehouse, listWarehouses, getWarehouse, updateWarehouse, deleteWarehouse, getNearestWarehouses, addLocation, listLocations, submitLocationRequest, listLocationRequests, reviewLocationRequest, getMyWarehouse, getInboundOrders, warehouseService;
+var init_warehouse_service = __esm({
+  "src/module/warehouse/warehouse.service.ts"() {
+    "use strict";
+    init_prisma();
+    init_AppError();
+    haversine = (lat1, lng1, lat2, lng2) => {
+      const R = 6371;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLng = (lng2 - lng1) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    };
+    createWarehouse = async (data) => {
+      return prisma.$transaction(async (tx) => {
+        const manager = await tx.user.findUnique({ where: { id: data.managerId } });
+        if (!manager) throw new AppError_default(status34.NOT_FOUND, "Manager user not found");
+        const warehouse = await tx.warehouse.create({
+          data,
+          include: { manager: { select: { id: true, name: true, email: true, role: true } } }
+        });
+        if (manager.role !== "ADMIN") {
+          await tx.user.update({
+            where: { id: data.managerId },
+            data: { role: "WAREHOUSE" }
+          });
+        }
+        return warehouse;
+      });
+    };
+    listWarehouses = (showAll = false) => prisma.warehouse.findMany({
+      ...showAll ? {} : { where: { isActive: true } },
+      include: { manager: { select: { id: true, name: true, email: true } }, _count: { select: { locationStocks: true, fulfillmentTasks: true } } },
+      orderBy: { name: "asc" }
+    });
+    getWarehouse = async (id) => {
+      const w = await prisma.warehouse.findUnique({
+        where: { id },
+        include: {
+          manager: { select: { id: true, name: true, email: true } },
+          locations: true,
+          locationStocks: { include: { medicine: { select: { id: true, name: true, price: true, image: true } } } },
+          storageBins: { include: { location: true } }
+        }
+      });
+      if (!w) throw new AppError_default(status34.NOT_FOUND, "Warehouse not found");
+      return w;
+    };
+    updateWarehouse = async (id, data) => {
+      const w = await prisma.warehouse.findUnique({ where: { id } });
+      if (!w) throw new AppError_default(status34.NOT_FOUND, "Warehouse not found");
+      return prisma.warehouse.update({ where: { id }, data });
+    };
+    deleteWarehouse = async (id) => {
+      return prisma.$transaction(async (tx) => {
+        const warehouse = await tx.warehouse.findUnique({
+          where: { id },
+          select: { managerId: true }
+        });
+        if (!warehouse) throw new AppError_default(status34.NOT_FOUND, "Warehouse not found");
+        await tx.warehouse.delete({ where: { id } });
+        const manager = await tx.user.findUnique({ where: { id: warehouse.managerId } });
+        if (manager && manager.role === "WAREHOUSE") {
+          await tx.user.update({
+            where: { id: warehouse.managerId },
+            data: { role: "CUSTOMER" }
+          });
+        }
+      });
+    };
+    getNearestWarehouses = async (lat, lng) => {
+      const warehouses = await prisma.warehouse.findMany({ where: { isActive: true } });
+      return warehouses.map((w) => ({ ...w, distanceKm: parseFloat(haversine(lat, lng, w.lat, w.lng).toFixed(2)) })).sort((a, b) => a.distanceKm - b.distanceKm);
+    };
+    addLocation = (data) => prisma.warehouseLocation.create({ data });
+    listLocations = (warehouseId) => prisma.warehouseLocation.findMany({ where: { warehouseId }, include: { bins: true } });
+    submitLocationRequest = async (warehouseId, requestedById, data) => {
+      const wh = await prisma.warehouse.findUnique({ where: { id: warehouseId } });
+      if (!wh) throw new AppError_default(status34.NOT_FOUND, "Warehouse not found");
+      await prisma.warehouseLocationRequest.updateMany({
+        where: { warehouseId, status: "PENDING" },
+        data: { status: "REJECTED", adminNote: "Superseded by a newer request" }
+      });
+      return prisma.warehouseLocationRequest.create({
+        data: { warehouseId, requestedById, ...data },
+        include: { warehouse: { select: { name: true } }, requestedBy: { select: { name: true } } }
+      });
+    };
+    listLocationRequests = (filterStatus) => prisma.warehouseLocationRequest.findMany({
+      ...filterStatus ? { where: { status: filterStatus } } : {},
+      include: {
+        warehouse: { select: { id: true, name: true, city: true } },
+        requestedBy: { select: { id: true, name: true, email: true } },
+        reviewedBy: { select: { id: true, name: true } }
+      },
+      orderBy: { createdAt: "desc" }
+    });
+    reviewLocationRequest = async (reqId, reviewerId, action, adminNote) => {
+      const req = await prisma.warehouseLocationRequest.findUnique({
+        where: { id: reqId }
+      });
+      if (!req) throw new AppError_default(status34.NOT_FOUND, "Request not found");
+      if (req.status !== "PENDING") throw new AppError_default(status34.BAD_REQUEST, "Request already reviewed");
+      return prisma.$transaction(async (tx) => {
+        const updated = await tx.warehouseLocationRequest.update({
+          where: { id: reqId },
+          data: {
+            status: action,
+            reviewedById: reviewerId,
+            ...adminNote !== void 0 ? { adminNote } : {}
+          }
+        });
+        if (action === "APPROVED") {
+          const patch = {};
+          if (req.address) patch.address = req.address;
+          if (req.city) patch.city = req.city;
+          if (req.lat) patch.lat = req.lat;
+          if (req.lng) patch.lng = req.lng;
+          if (req.phone) patch.phone = req.phone;
+          if (Object.keys(patch).length > 0) {
+            await tx.warehouse.update({ where: { id: req.warehouseId }, data: patch });
+          }
+        }
+        return updated;
+      });
+    };
+    getMyWarehouse = async (userId) => {
+      const wh = await prisma.warehouse.findFirst({
+        where: { managerId: userId },
+        include: {
+          manager: { select: { id: true, name: true, email: true } },
+          locationStocks: {
+            include: {
+              medicine: { select: { id: true, name: true, price: true, image: true, stock: true, genericName: true } }
+            },
+            orderBy: { medicine: { name: "asc" } }
+          },
+          _count: { select: { locationStocks: true, fulfillmentTasks: true } }
+        }
+      });
+      if (!wh) throw new AppError_default(status34.NOT_FOUND, "No warehouse found for this manager");
+      return wh;
+    };
+    getInboundOrders = (warehouseId) => prisma.shipmentLeg.findMany({
+      where: { destWarehouseId: warehouseId },
+      include: {
+        subOrder: {
+          include: {
+            seller: { select: { id: true, name: true, email: true, businessCity: true } },
+            items: {
+              include: {
+                medicine: { select: { id: true, name: true, price: true, image: true } }
+              }
+            }
+          }
+        },
+        order: {
+          select: {
+            id: true,
+            address: true,
+            createdAt: true,
+            status: true,
+            user: { select: { name: true, email: true } }
+          }
+        },
+        originWarehouse: { select: { id: true, name: true, city: true, address: true, phone: true } },
+        destWarehouse: { select: { id: true, name: true, city: true, address: true } }
+      },
+      orderBy: { createdAt: "desc" }
+    });
+    warehouseService = {
+      createWarehouse,
+      listWarehouses,
+      getWarehouse,
+      updateWarehouse,
+      deleteWarehouse,
+      getNearestWarehouses,
+      addLocation,
+      listLocations,
+      submitLocationRequest,
+      listLocationRequests,
+      reviewLocationRequest,
+      getMyWarehouse,
+      getInboundOrders
+    };
+  }
+});
+
+// src/module/warehouse/warehouse.controller.ts
+import status35 from "http-status";
+var createWarehouse2, listWarehouses2, getWarehouse2, updateWarehouse2, getNearestWarehouses2, addLocation2, listLocations2, deleteWarehouse2, submitLocationRequest2, listLocationRequests2, reviewLocationRequest2, getMyWarehouse2, getInboundOrders2, warehouseController;
+var init_warehouse_controller = __esm({
+  "src/module/warehouse/warehouse.controller.ts"() {
+    "use strict";
+    init_catchAsync();
+    init_sendResponse();
+    init_warehouse_service();
+    createWarehouse2 = catchAsync(async (req, res) => {
+      const data = await warehouseService.createWarehouse(req.body);
+      sendResponse(res, { status: status35.CREATED, success: true, message: "Warehouse created", data });
+    });
+    listWarehouses2 = catchAsync(async (req, res) => {
+      const showAll = req.user?.role === "ADMIN";
+      const data = await warehouseService.listWarehouses(showAll);
+      sendResponse(res, { status: status35.OK, success: true, message: "Warehouses fetched", data });
+    });
+    getWarehouse2 = catchAsync(async (req, res) => {
+      const data = await warehouseService.getWarehouse(req.params.id);
+      sendResponse(res, { status: status35.OK, success: true, message: "Warehouse fetched", data });
+    });
+    updateWarehouse2 = catchAsync(async (req, res) => {
+      const data = await warehouseService.updateWarehouse(req.params.id, req.body);
+      sendResponse(res, { status: status35.OK, success: true, message: "Warehouse updated", data });
+    });
+    getNearestWarehouses2 = catchAsync(async (req, res) => {
+      const lat = parseFloat(req.query.lat);
+      const lng = parseFloat(req.query.lng);
+      if (isNaN(lat) || isNaN(lng)) {
+        return res.status(400).json({ success: false, message: "lat and lng query params are required" });
+      }
+      const data = await warehouseService.getNearestWarehouses(lat, lng);
+      sendResponse(res, { status: status35.OK, success: true, message: "Nearest warehouses", data });
+    });
+    addLocation2 = catchAsync(async (req, res) => {
+      const data = await warehouseService.addLocation(req.body);
+      sendResponse(res, { status: status35.CREATED, success: true, message: "Location added", data });
+    });
+    listLocations2 = catchAsync(async (req, res) => {
+      const data = await warehouseService.listLocations(req.params.warehouseId);
+      sendResponse(res, { status: status35.OK, success: true, message: "Locations fetched", data });
+    });
+    deleteWarehouse2 = catchAsync(async (req, res) => {
+      await warehouseService.deleteWarehouse(req.params.id);
+      sendResponse(res, { status: status35.OK, success: true, message: "Warehouse deleted and manager role reverted to CUSTOMER", data: null });
+    });
+    submitLocationRequest2 = catchAsync(async (req, res) => {
+      const data = await warehouseService.submitLocationRequest(
+        req.params.id,
+        req.user.id,
+        req.body
+      );
+      sendResponse(res, { status: status35.CREATED, success: true, message: "Location change request submitted. Awaiting admin approval.", data });
+    });
+    listLocationRequests2 = catchAsync(async (req, res) => {
+      const filterStatus = req.query.status;
+      const data = await warehouseService.listLocationRequests(filterStatus);
+      sendResponse(res, { status: status35.OK, success: true, message: "Location requests fetched", data });
+    });
+    reviewLocationRequest2 = catchAsync(async (req, res) => {
+      const { action, adminNote } = req.body;
+      if (!["APPROVED", "REJECTED"].includes(action))
+        return res.status(400).json({ success: false, message: "action must be APPROVED or REJECTED" });
+      const data = await warehouseService.reviewLocationRequest(
+        req.params.reqId,
+        req.user.id,
+        action,
+        adminNote
+      );
+      sendResponse(res, { status: status35.OK, success: true, message: `Request ${action.toLowerCase()}`, data });
+    });
+    getMyWarehouse2 = catchAsync(async (req, res) => {
+      const data = await warehouseService.getMyWarehouse(req.user.id);
+      sendResponse(res, { status: status35.OK, success: true, message: "Your warehouse fetched", data });
+    });
+    getInboundOrders2 = catchAsync(async (req, res) => {
+      const data = await warehouseService.getInboundOrders(req.params.warehouseId);
+      sendResponse(res, { status: status35.OK, success: true, message: "Inbound orders fetched", data });
+    });
+    warehouseController = {
+      createWarehouse: createWarehouse2,
+      listWarehouses: listWarehouses2,
+      getWarehouse: getWarehouse2,
+      updateWarehouse: updateWarehouse2,
+      deleteWarehouse: deleteWarehouse2,
+      getNearestWarehouses: getNearestWarehouses2,
+      addLocation: addLocation2,
+      listLocations: listLocations2,
+      submitLocationRequest: submitLocationRequest2,
+      listLocationRequests: listLocationRequests2,
+      reviewLocationRequest: reviewLocationRequest2,
+      getMyWarehouse: getMyWarehouse2,
+      getInboundOrders: getInboundOrders2
+    };
+  }
+});
+
+// src/module/warehouse/locationStock.service.ts
+import status36 from "http-status";
+var getStock, adjustStock, setStock, locationStockService;
+var init_locationStock_service = __esm({
+  "src/module/warehouse/locationStock.service.ts"() {
+    "use strict";
+    init_prisma();
+    init_AppError();
+    getStock = (warehouseId) => prisma.locationStock.findMany({
+      where: { warehouseId },
+      include: { medicine: { select: { id: true, name: true, price: true, image: true, stock: true } } },
+      orderBy: { medicine: { name: "asc" } }
+    });
+    adjustStock = async (warehouseId, medicineId, delta) => {
+      const existing = await prisma.locationStock.findUnique({
+        where: { warehouseId_medicineId: { warehouseId, medicineId } }
+      });
+      if (existing) {
+        const newQty = existing.quantity + delta;
+        if (newQty < 0) throw new AppError_default(status36.BAD_REQUEST, "Insufficient warehouse stock");
+        return prisma.locationStock.update({
+          where: { warehouseId_medicineId: { warehouseId, medicineId } },
+          data: { quantity: newQty }
+        });
+      }
+      if (delta < 0) throw new AppError_default(status36.BAD_REQUEST, "No stock record found");
+      return prisma.locationStock.create({ data: { warehouseId, medicineId, quantity: delta } });
+    };
+    setStock = (warehouseId, medicineId, quantity) => prisma.locationStock.upsert({
+      where: { warehouseId_medicineId: { warehouseId, medicineId } },
+      update: { quantity },
+      create: { warehouseId, medicineId, quantity }
+    });
+    locationStockService = { getStock, adjustStock, setStock };
+  }
+});
+
+// src/module/warehouse/warehouse.route.ts
+import { Router as Router29 } from "express";
+import status37 from "http-status";
+var router29, warehouseRouter;
+var init_warehouse_route = __esm({
+  "src/module/warehouse/warehouse.route.ts"() {
+    "use strict";
+    init_auth_middleware();
+    init_warehouse_controller();
+    init_catchAsync();
+    init_sendResponse();
+    init_locationStock_service();
+    router29 = Router29();
+    router29.post("/", auth_middleware_default(["ADMIN"]), warehouseController.createWarehouse);
+    router29.get("/my", auth_middleware_default(["WAREHOUSE", "ADMIN"]), warehouseController.getMyWarehouse);
+    router29.get("/", auth_middleware_default(["ADMIN", "WAREHOUSE"]), warehouseController.listWarehouses);
+    router29.get("/nearest", warehouseController.getNearestWarehouses);
+    router29.get("/:id", auth_middleware_default(["ADMIN", "WAREHOUSE"]), warehouseController.getWarehouse);
+    router29.patch("/:id", auth_middleware_default(["ADMIN"]), warehouseController.updateWarehouse);
+    router29.delete("/:id", auth_middleware_default(["ADMIN"]), warehouseController.deleteWarehouse);
+    router29.post("/:id/location-request", auth_middleware_default(["WAREHOUSE"]), warehouseController.submitLocationRequest);
+    router29.get("/location-requests/all", auth_middleware_default(["ADMIN"]), warehouseController.listLocationRequests);
+    router29.patch("/location-requests/:reqId/review", auth_middleware_default(["ADMIN"]), warehouseController.reviewLocationRequest);
+    router29.post("/locations/add", auth_middleware_default(["ADMIN", "WAREHOUSE"]), warehouseController.addLocation);
+    router29.get("/:warehouseId/locations", auth_middleware_default(["ADMIN", "WAREHOUSE"]), warehouseController.listLocations);
+    router29.get("/:warehouseId/inbound-orders", auth_middleware_default(["ADMIN", "WAREHOUSE"]), warehouseController.getInboundOrders);
+    router29.get(
+      "/:warehouseId/stock",
+      auth_middleware_default(["ADMIN", "WAREHOUSE"]),
+      catchAsync(async (req, res) => {
+        const data = await locationStockService.getStock(req.params.warehouseId);
+        sendResponse(res, { status: status37.OK, success: true, message: "Stock fetched", data });
+      })
+    );
+    router29.post(
+      "/stock/adjust",
+      auth_middleware_default(["ADMIN", "WAREHOUSE"]),
+      catchAsync(async (req, res) => {
+        const { warehouseId, medicineId, delta } = req.body;
+        const data = await locationStockService.adjustStock(warehouseId, medicineId, delta);
+        sendResponse(res, { status: status37.OK, success: true, message: "Stock adjusted", data });
+      })
+    );
+    warehouseRouter = router29;
+  }
+});
+
+// src/module/stockTransfer/stockTransfer.service.ts
+import status38 from "http-status";
+var createTransfer, listTransfers, approveTransfer, completeTransfer, cancelTransfer, stockTransferService;
+var init_stockTransfer_service = __esm({
+  "src/module/stockTransfer/stockTransfer.service.ts"() {
+    "use strict";
+    init_prisma();
+    init_AppError();
+    init_locationStock_service();
+    createTransfer = async (data) => {
+      const { items, ...transferData } = data;
+      return prisma.stockTransfer.create({
+        data: {
+          ...transferData,
+          items: { create: items }
+        },
+        include: { items: { include: { medicine: { select: { id: true, name: true } } } } }
+      });
+    };
+    listTransfers = (warehouseId) => prisma.stockTransfer.findMany({
+      where: warehouseId ? { OR: [{ fromWarehouseId: warehouseId }, { toWarehouseId: warehouseId }] } : {},
+      include: {
+        fromWarehouse: { select: { id: true, name: true, city: true } },
+        toWarehouse: { select: { id: true, name: true, city: true } },
+        requestedBy: { select: { id: true, name: true } },
+        items: { include: { medicine: { select: { id: true, name: true } } } }
+      },
+      orderBy: { createdAt: "desc" }
+    });
+    approveTransfer = async (id) => {
+      const transfer = await prisma.stockTransfer.findUnique({
+        where: { id },
+        include: { items: true }
+      });
+      if (!transfer) throw new AppError_default(status38.NOT_FOUND, "Transfer not found");
+      if (transfer.status !== "PENDING") throw new AppError_default(status38.BAD_REQUEST, "Transfer is not PENDING");
+      for (const item of transfer.items) {
+        const src = await prisma.locationStock.findUnique({
+          where: { warehouseId_medicineId: { warehouseId: transfer.fromWarehouseId, medicineId: item.medicineId } }
+        });
+        if (!src || src.quantity < item.quantity) {
+          throw new AppError_default(status38.BAD_REQUEST, `Insufficient stock for medicine ${item.medicineId} in source warehouse`);
+        }
+      }
+      return prisma.stockTransfer.update({ where: { id }, data: { status: "IN_TRANSIT" } });
+    };
+    completeTransfer = async (id) => {
+      const transfer = await prisma.stockTransfer.findUnique({
+        where: { id },
+        include: { items: true }
+      });
+      if (!transfer) throw new AppError_default(status38.NOT_FOUND, "Transfer not found");
+      if (transfer.status !== "IN_TRANSIT") throw new AppError_default(status38.BAD_REQUEST, "Transfer must be IN_TRANSIT");
+      await Promise.all(transfer.items.map(async (item) => {
+        await locationStockService.adjustStock(transfer.fromWarehouseId, item.medicineId, -item.quantity);
+        await locationStockService.adjustStock(transfer.toWarehouseId, item.medicineId, item.quantity);
+      }));
+      return prisma.stockTransfer.update({ where: { id }, data: { status: "COMPLETED" } });
+    };
+    cancelTransfer = async (id) => {
+      const transfer = await prisma.stockTransfer.findUnique({ where: { id } });
+      if (!transfer) throw new AppError_default(status38.NOT_FOUND, "Transfer not found");
+      if (transfer.status === "COMPLETED") throw new AppError_default(status38.BAD_REQUEST, "Cannot cancel a completed transfer");
+      return prisma.stockTransfer.update({ where: { id }, data: { status: "CANCELLED" } });
+    };
+    stockTransferService = { createTransfer, listTransfers, approveTransfer, completeTransfer, cancelTransfer };
+  }
+});
+
+// src/module/stockTransfer/stockTransfer.route.ts
+import { Router as Router30 } from "express";
+import status39 from "http-status";
+var router30, stockTransferRouter;
+var init_stockTransfer_route = __esm({
+  "src/module/stockTransfer/stockTransfer.route.ts"() {
+    "use strict";
+    init_auth_middleware();
+    init_catchAsync();
+    init_sendResponse();
+    init_stockTransfer_service();
+    router30 = Router30();
+    router30.post("/", auth_middleware_default(["ADMIN", "WAREHOUSE"]), catchAsync(async (req, res) => {
+      const data = await stockTransferService.createTransfer({ ...req.body, requestedById: req.user.id });
+      sendResponse(res, { status: status39.CREATED, success: true, message: "Transfer created", data });
+    }));
+    router30.get("/", auth_middleware_default(["ADMIN", "WAREHOUSE"]), catchAsync(async (req, res) => {
+      const warehouseId = req.query.warehouseId;
+      const data = await stockTransferService.listTransfers(warehouseId);
+      sendResponse(res, { status: status39.OK, success: true, message: "Transfers fetched", data });
+    }));
+    router30.patch("/:id/approve", auth_middleware_default(["ADMIN"]), catchAsync(async (req, res) => {
+      const data = await stockTransferService.approveTransfer(req.params.id);
+      sendResponse(res, { status: status39.OK, success: true, message: "Transfer approved (IN_TRANSIT)", data });
+    }));
+    router30.patch("/:id/complete", auth_middleware_default(["ADMIN", "WAREHOUSE"]), catchAsync(async (req, res) => {
+      const data = await stockTransferService.completeTransfer(req.params.id);
+      sendResponse(res, { status: status39.OK, success: true, message: "Transfer completed \u2014 stock moved", data });
+    }));
+    router30.patch("/:id/cancel", auth_middleware_default(["ADMIN"]), catchAsync(async (req, res) => {
+      const data = await stockTransferService.cancelTransfer(req.params.id);
+      sendResponse(res, { status: status39.OK, success: true, message: "Transfer cancelled", data });
+    }));
+    stockTransferRouter = router30;
+  }
+});
+
+// src/module/grn/grn.service.ts
+import status40 from "http-status";
+var createGRN, listGRNs, getGRN, verifyGRN, grnService;
+var init_grn_service = __esm({
+  "src/module/grn/grn.service.ts"() {
+    "use strict";
+    init_prisma();
+    init_AppError();
+    init_locationStock_service();
+    createGRN = (data) => {
+      const { items, ...grnData } = data;
+      return prisma.goodsReceiptNote.create({
+        data: {
+          ...grnData,
+          items: {
+            create: items.map((i) => ({
+              medicine: { connect: { id: i.medicineId } },
+              expectedQty: i.expectedQty,
+              receivedQty: i.receivedQty,
+              ...i.batchNumber ? { batchNumber: i.batchNumber } : {},
+              ...i.expiryDate ? { expiryDate: new Date(i.expiryDate) } : {}
+            }))
+          }
+        },
+        include: { items: { include: { medicine: { select: { id: true, name: true } } } }, supplier: true }
+      });
+    };
+    listGRNs = (warehouseId) => prisma.goodsReceiptNote.findMany({
+      where: warehouseId ? { warehouseId } : {},
+      include: {
+        supplier: { select: { id: true, name: true } },
+        warehouse: { select: { id: true, name: true } },
+        receivedBy: { select: { id: true, name: true } },
+        items: { include: { medicine: { select: { id: true, name: true } } } }
+      },
+      orderBy: { createdAt: "desc" }
+    });
+    getGRN = async (id) => {
+      const grn = await prisma.goodsReceiptNote.findUnique({
+        where: { id },
+        include: {
+          supplier: true,
+          warehouse: true,
+          receivedBy: { select: { id: true, name: true } },
+          items: { include: { medicine: true } }
+        }
+      });
+      if (!grn) throw new AppError_default(status40.NOT_FOUND, "GRN not found");
+      return grn;
+    };
+    verifyGRN = async (id) => {
+      const grn = await prisma.goodsReceiptNote.findUnique({
+        where: { id },
+        include: { items: true }
+      });
+      if (!grn) throw new AppError_default(status40.NOT_FOUND, "GRN not found");
+      if (grn.status === "VERIFIED") throw new AppError_default(status40.BAD_REQUEST, "GRN already verified");
+      const now = /* @__PURE__ */ new Date();
+      await Promise.all(grn.items.map(async (item) => {
+        await locationStockService.adjustStock(grn.warehouseId, item.medicineId, item.receivedQty);
+        if (item.expiryDate) {
+          const daysLeft = Math.floor((item.expiryDate.getTime() - now.getTime()) / 864e5);
+          if (daysLeft <= 90) {
+            const severity = daysLeft <= 7 ? "CRITICAL" : daysLeft <= 30 ? "HIGH" : daysLeft <= 60 ? "MEDIUM" : "LOW";
+            await prisma.expiryAlert.create({
+              data: {
+                warehouseId: grn.warehouseId,
+                medicineId: item.medicineId,
+                batchNumber: item.batchNumber || "N/A",
+                expiresAt: item.expiryDate,
+                daysLeft,
+                severity
+              }
+            });
+          }
+        }
+      }));
+      return prisma.goodsReceiptNote.update({ where: { id }, data: { status: "VERIFIED" } });
+    };
+    grnService = { createGRN, listGRNs, getGRN, verifyGRN };
+  }
+});
+
+// src/module/grn/grn.route.ts
+import { Router as Router31 } from "express";
+import status41 from "http-status";
+var router31, grnRouter;
+var init_grn_route = __esm({
+  "src/module/grn/grn.route.ts"() {
+    "use strict";
+    init_auth_middleware();
+    init_catchAsync();
+    init_sendResponse();
+    init_grn_service();
+    router31 = Router31();
+    router31.post("/", auth_middleware_default(["WAREHOUSE", "SELLER"]), catchAsync(async (req, res) => {
+      const data = await grnService.createGRN({ ...req.body, receivedById: req.user.id });
+      sendResponse(res, { status: status41.CREATED, success: true, message: "GRN created", data });
+    }));
+    router31.get("/", auth_middleware_default(["ADMIN", "WAREHOUSE"]), catchAsync(async (req, res) => {
+      const data = await grnService.listGRNs(req.query.warehouseId);
+      sendResponse(res, { status: status41.OK, success: true, message: "GRNs fetched", data });
+    }));
+    router31.get("/:id", auth_middleware_default(["ADMIN", "WAREHOUSE"]), catchAsync(async (req, res) => {
+      const data = await grnService.getGRN(req.params.id);
+      sendResponse(res, { status: status41.OK, success: true, message: "GRN fetched", data });
+    }));
+    router31.patch("/:id/verify", auth_middleware_default(["WAREHOUSE"]), catchAsync(async (req, res) => {
+      const data = await grnService.verifyGRN(req.params.id);
+      sendResponse(res, { status: status41.OK, success: true, message: "GRN verified \u2014 stock updated", data });
+    }));
+    grnRouter = router31;
+  }
+});
+
+// src/module/fulfillment/fulfillment.service.ts
+import status42 from "http-status";
+var getQueue, getMyQueue, assignTask, receiveSellerItems, packTask, dispatchTask, markDelivered, getTask, fulfillmentService;
+var init_fulfillment_service = __esm({
+  "src/module/fulfillment/fulfillment.service.ts"() {
+    "use strict";
+    init_enums();
+    init_prisma();
+    init_AppError();
+    getQueue = (warehouseId) => prisma.fulfillmentTask.findMany({
+      where: { warehouseId },
+      include: {
+        order: {
+          include: {
+            items: { include: { medicine: { select: { id: true, name: true, image: true } } } },
+            user: { select: { id: true, name: true, email: true } },
+            subOrders: { include: { seller: { select: { id: true, name: true } } } },
+            tracking: { orderBy: { createdAt: "asc" } }
+          }
+        },
+        assignedTo: { select: { id: true, name: true } },
+        packingSlip: true
+      },
+      orderBy: { createdAt: "asc" }
+    });
+    getMyQueue = async (_userId) => {
+      const user = await prisma.user.findUnique({
+        where: { id: _userId },
+        select: { role: true }
+      });
+      if (!user) throw new AppError_default(status42.NOT_FOUND, "User not found");
+      const where = {};
+      if (user.role !== "ADMIN") {
+        const managedWarehouses = await prisma.warehouse.findMany({
+          where: { managerId: _userId },
+          select: { id: true }
+        });
+        if (managedWarehouses.length === 0) return [];
+        where.warehouseId = { in: managedWarehouses.map((w) => w.id) };
+      }
+      return prisma.fulfillmentTask.findMany({
+        where,
+        include: {
+          order: {
+            include: {
+              items: { include: { medicine: { select: { id: true, name: true, image: true } } } },
+              user: { select: { id: true, name: true, email: true } },
+              subOrders: {
+                include: {
+                  seller: { select: { id: true, name: true } },
+                  items: { select: { price: true, quantity: true } },
+                  // ✅ Include stagedAt so UI can show per-seller staging progress
+                  shipmentLeg: {
+                    select: {
+                      id: true,
+                      status: true,
+                      stagedAt: true,
+                      arrivedAtDestAt: true,
+                      originWarehouse: { select: { name: true, city: true } }
+                    }
+                  }
+                }
+              },
+              tracking: { orderBy: { createdAt: "asc" } }
+            }
+          },
+          warehouse: { select: { id: true, name: true } },
+          assignedTo: { select: { id: true, name: true } },
+          packingSlip: true
+        },
+        orderBy: { createdAt: "asc" }
+      });
+    };
+    assignTask = async (orderId, warehouseId, assignedToId) => {
+      const existing = await prisma.fulfillmentTask.findUnique({ where: { orderId } });
+      if (existing) {
+        if (!["PENDING", "READY"].includes(existing.status)) {
+          throw new AppError_default(
+            status42.BAD_REQUEST,
+            `Cannot assign task: current status is ${existing.status}. Task must be PENDING or READY.`
+          );
+        }
+        return prisma.fulfillmentTask.update({
+          where: { orderId },
+          data: { warehouseId, assignedToId, status: "PICKED", startedAt: /* @__PURE__ */ new Date() }
+        });
+      }
+      return prisma.fulfillmentTask.create({
+        data: { orderId, warehouseId, assignedToId, status: "PICKED", startedAt: /* @__PURE__ */ new Date() }
+      });
+    };
+    receiveSellerItems = async (taskId, subOrderId, userId) => {
+      const task = await prisma.fulfillmentTask.findUnique({
+        where: { id: taskId },
+        include: {
+          order: { include: { subOrders: { select: { id: true } } } },
+          packingSlip: true
+        }
+      });
+      if (!task) throw new AppError_default(status42.NOT_FOUND, "Task not found");
+      const leg = await prisma.shipmentLeg.findFirst({
+        where: { subOrderId },
+        orderBy: { createdAt: "desc" }
+      });
+      if (!leg) throw new AppError_default(status42.NOT_FOUND, "Shipment leg not found for this sub-order");
+      if (leg.status !== "AT_DEST_WH") {
+        throw new AppError_default(
+          status42.BAD_REQUEST,
+          `Cannot stage: package has not arrived at the destination warehouse yet (leg status: ${leg.status}). Complete the routing steps first.`
+        );
+      }
+      await prisma.shipmentLeg.update({
+        where: { id: leg.id },
+        data: { stagedAt: /* @__PURE__ */ new Date() }
+      });
+      const currentData = task.packingSlip?.items ?? { receivedSubOrderIds: [] };
+      const received = Array.isArray(currentData.receivedSubOrderIds) ? currentData.receivedSubOrderIds : [];
+      if (!received.includes(subOrderId)) received.push(subOrderId);
+      const newItems = { ...currentData, receivedSubOrderIds: received };
+      const packedBy = task.assignedToId ?? userId;
+      const slip = await prisma.packingSlip.upsert({
+        where: { fulfillmentTaskId: taskId },
+        update: { items: newItems },
+        create: { fulfillmentTaskId: taskId, packedBy, items: newItems }
+      });
+      const allIds = task.order.subOrders.map((s) => s.id);
+      const allReceived = allIds.every((id) => received.includes(id));
+      if (allReceived) {
+        await prisma.fulfillmentTask.update({
+          where: { id: taskId },
+          data: { status: "PICKED", assignedToId: userId, startedAt: task.startedAt ?? /* @__PURE__ */ new Date() }
+        });
+      } else if (["PENDING", "READY", "CONSOLIDATING"].includes(task.status)) {
+        await prisma.fulfillmentTask.update({
+          where: { id: taskId },
+          data: { status: "CONSOLIDATING", assignedToId: userId, startedAt: task.startedAt ?? /* @__PURE__ */ new Date() }
+        });
+      }
+      return {
+        slip,
+        receivedSubOrderIds: received,
+        allReceived,
+        receivedCount: received.length,
+        totalCount: allIds.length
+      };
+    };
+    packTask = async (taskId, packedBy, items) => {
+      const task = await prisma.fulfillmentTask.findUnique({
+        where: { id: taskId },
+        include: { packingSlip: true }
+      });
+      if (!task) throw new AppError_default(status42.NOT_FOUND, "Task not found");
+      if (task.status === "CONSOLIDATING") {
+        throw new AppError_default(
+          status42.BAD_REQUEST,
+          "Cannot pack yet \u2014 waiting for remaining seller packages to be staged."
+        );
+      }
+      if (!["PICKED", "READY"].includes(task.status)) {
+        throw new AppError_default(
+          status42.BAD_REQUEST,
+          `Cannot pack task: current status is ${task.status}. Task must be PICKED or READY.`
+        );
+      }
+      await prisma.fulfillmentTask.update({
+        where: { id: taskId },
+        data: { status: "PACKED", packedAt: /* @__PURE__ */ new Date() }
+      });
+      const existingSlip = task.packingSlip;
+      const existingData = existingSlip?.items ?? {};
+      const newItems = { ...existingData, packedBy, packedItems: items };
+      if (existingSlip) {
+        return prisma.packingSlip.update({
+          where: { id: existingSlip.id },
+          data: { packedBy, items: newItems }
+        });
+      }
+      return prisma.packingSlip.create({
+        data: { fulfillmentTaskId: taskId, packedBy, items: newItems }
+      });
+    };
+    dispatchTask = async (taskId) => {
+      const task = await prisma.fulfillmentTask.findUnique({ where: { id: taskId } });
+      if (!task) throw new AppError_default(status42.NOT_FOUND, "Task not found");
+      if (task.status !== "PACKED")
+        throw new AppError_default(status42.BAD_REQUEST, "Task must be PACKED before dispatch");
+      await prisma.order.update({
+        where: { id: task.orderId },
+        data: { status: "SHIPPED" }
+      });
+      await prisma.orderTracking.create({
+        data: {
+          orderId: task.orderId,
+          status: "SHIPPED",
+          note: "Package dispatched from warehouse. Out for final-mile delivery."
+        }
+      });
+      return prisma.fulfillmentTask.update({
+        where: { id: taskId },
+        data: { status: "DISPATCHED", dispatchedAt: /* @__PURE__ */ new Date() }
+      });
+    };
+    markDelivered = async (taskId) => {
+      const task = await prisma.fulfillmentTask.findUnique({
+        where: { id: taskId },
+        include: {
+          order: {
+            include: {
+              user: { select: { id: true, name: true } },
+              subOrders: {
+                include: { items: { select: { price: true, quantity: true } } }
+              }
+            }
+          }
+        }
+      });
+      if (!task) throw new AppError_default(status42.NOT_FOUND, "Task not found");
+      if (task.status !== "DISPATCHED")
+        throw new AppError_default(status42.BAD_REQUEST, "Task must be DISPATCHED before marking delivered");
+      await prisma.$transaction(async (tx) => {
+        await tx.fulfillmentTask.update({
+          where: { id: taskId },
+          data: { status: "DELIVERED" }
+        });
+        await tx.order.update({ where: { id: task.orderId }, data: { status: "DELIVERED" } });
+        await tx.subOrder.updateMany({ where: { orderId: task.orderId }, data: { status: "DELIVERED" } });
+        await tx.orderItem.updateMany({ where: { orderId: task.orderId }, data: { status: "DELIVERED" } });
+        await tx.orderTracking.create({
+          data: {
+            orderId: task.orderId,
+            status: "DELIVERED",
+            note: "Package delivered to customer. Seller earnings credited."
+          }
+        });
+        for (const subOrder of task.order.subOrders) {
+          const fromItems = subOrder.items.reduce((s, i) => s + i.price * i.quantity, 0);
+          const computedTotal = fromItems > 0 ? fromItems : subOrder.total;
+          if (computedTotal <= 0) continue;
+          let wallet = await tx.wallet.findUnique({ where: { userId: subOrder.sellerId } });
+          if (!wallet) {
+            wallet = await tx.wallet.create({ data: { userId: subOrder.sellerId, balance: 0 } });
+          }
+          await tx.wallet.update({
+            where: { id: wallet.id },
+            data: { balance: { increment: computedTotal } }
+          });
+          await tx.walletTransaction.create({
+            data: {
+              walletId: wallet.id,
+              amount: computedTotal,
+              type: TransactionType.DEPOSIT,
+              description: `Order #${task.orderId.slice(-8).toUpperCase()} delivered \u2014 \u09F3${computedTotal.toFixed(2)} credited`
+            }
+          });
+        }
+        await tx.notification.create({
+          data: {
+            userId: task.order.user.id,
+            type: "ORDER_UPDATE",
+            title: "Your order has been delivered! \u{1F389}",
+            body: `Order #${task.orderId.slice(-8).toUpperCase()} has been successfully delivered to your address.`
+          }
+        });
+      });
+      return { message: "Delivered. Seller wallets credited.", orderId: task.orderId };
+    };
+    getTask = (taskId) => prisma.fulfillmentTask.findUnique({
+      where: { id: taskId },
+      include: {
+        order: {
+          include: {
+            items: { include: { medicine: true } },
+            user: { select: { id: true, name: true } },
+            subOrders: {
+              include: {
+                seller: { select: { id: true, name: true } },
+                shipmentLeg: { select: { id: true, status: true, stagedAt: true } }
+              }
+            },
+            tracking: { orderBy: { createdAt: "asc" } }
+          }
+        },
+        assignedTo: { select: { id: true, name: true } },
+        packingSlip: true
+      }
+    });
+    fulfillmentService = {
+      getQueue,
+      getMyQueue,
+      assignTask,
+      receiveSellerItems,
+      packTask,
+      dispatchTask,
+      markDelivered,
+      getTask
+    };
+  }
+});
+
+// src/module/fulfillment/fulfillment.route.ts
+import { Router as Router32 } from "express";
+import status43 from "http-status";
+var router32, fulfillmentRouter;
+var init_fulfillment_route = __esm({
+  "src/module/fulfillment/fulfillment.route.ts"() {
+    "use strict";
+    init_auth_middleware();
+    init_catchAsync();
+    init_sendResponse();
+    init_fulfillment_service();
+    init_prisma();
+    router32 = Router32();
+    router32.get("/my-queue", auth_middleware_default(["WAREHOUSE", "ADMIN"]), catchAsync(async (req, res) => {
+      const data = await fulfillmentService.getMyQueue(req.user.id);
+      sendResponse(res, { status: status43.OK, success: true, message: "My queue fetched", data });
+    }));
+    router32.get("/queue/:warehouseId", auth_middleware_default(["WAREHOUSE", "ADMIN"]), catchAsync(async (req, res) => {
+      const data = await fulfillmentService.getQueue(req.params.warehouseId);
+      sendResponse(res, { status: status43.OK, success: true, message: "Queue fetched", data });
+    }));
+    router32.post("/assign", auth_middleware_default(["WAREHOUSE", "ADMIN"]), catchAsync(async (req, res) => {
+      const { orderId, warehouseId, assignedToId } = req.body;
+      const data = await fulfillmentService.assignTask(orderId, warehouseId, assignedToId || req.user.id);
+      sendResponse(res, { status: status43.OK, success: true, message: "Task assigned", data });
+    }));
+    router32.patch("/:taskId/pick", auth_middleware_default(["WAREHOUSE", "ADMIN"]), catchAsync(async (req, res) => {
+      const task = await prisma.fulfillmentTask.findUnique({
+        where: { id: req.params.taskId }
+      });
+      if (!task) {
+        return sendResponse(res, { status: status43.NOT_FOUND, success: false, message: "Task not found", data: null });
+      }
+      const data = await fulfillmentService.assignTask(task.orderId, task.warehouseId, req.user.id);
+      sendResponse(res, { status: status43.OK, success: true, message: "Picking started", data });
+    }));
+    router32.patch("/:taskId/receive-seller/:subOrderId", auth_middleware_default(["WAREHOUSE", "ADMIN"]), catchAsync(async (req, res) => {
+      const data = await fulfillmentService.receiveSellerItems(
+        req.params.taskId,
+        req.params.subOrderId,
+        req.user.id
+        // passed as packedBy for PackingSlip
+      );
+      sendResponse(res, {
+        status: status43.OK,
+        success: true,
+        message: data.allReceived ? "All seller items received \u2014 order ready to pack!" : `Received ${data.receivedCount}/${data.totalCount} seller shipments`,
+        data
+      });
+    }));
+    router32.patch("/:taskId/pack", auth_middleware_default(["WAREHOUSE", "ADMIN"]), catchAsync(async (req, res) => {
+      const data = await fulfillmentService.packTask(
+        req.params.taskId,
+        req.user.id,
+        req.body.items || []
+      );
+      sendResponse(res, { status: status43.OK, success: true, message: "Packed \u2014 packing slip created", data });
+    }));
+    router32.patch("/:taskId/dispatch", auth_middleware_default(["WAREHOUSE", "ADMIN"]), catchAsync(async (req, res) => {
+      const data = await fulfillmentService.dispatchTask(req.params.taskId);
+      sendResponse(res, { status: status43.OK, success: true, message: "Dispatched to customer", data });
+    }));
+    router32.patch("/:taskId/deliver", auth_middleware_default(["WAREHOUSE", "ADMIN"]), catchAsync(async (req, res) => {
+      const data = await fulfillmentService.markDelivered(req.params.taskId);
+      sendResponse(res, { status: status43.OK, success: true, message: "Order delivered. Wallets credited.", data });
+    }));
+    router32.get("/:taskId", auth_middleware_default(["WAREHOUSE", "ADMIN"]), catchAsync(async (req, res) => {
+      const data = await fulfillmentService.getTask(req.params.taskId);
+      sendResponse(res, { status: status43.OK, success: true, message: "Task fetched", data });
+    }));
+    fulfillmentRouter = router32;
+  }
+});
+
+// src/module/expiryAlert/expiryAlert.route.ts
+import { Router as Router33 } from "express";
+import status44 from "http-status";
+var router33, expiryAlertRouter;
+var init_expiryAlert_route = __esm({
+  "src/module/expiryAlert/expiryAlert.route.ts"() {
+    "use strict";
+    init_auth_middleware();
+    init_catchAsync();
+    init_sendResponse();
+    init_prisma();
+    router33 = Router33();
+    router33.get("/", auth_middleware_default(["ADMIN", "WAREHOUSE"]), catchAsync(async (req, res) => {
+      const { warehouseId, days, severity } = req.query;
+      const cutoff = days ? new Date(Date.now() + Number(days) * 864e5) : void 0;
+      const data = await prisma.expiryAlert.findMany({
+        where: {
+          ...warehouseId ? { warehouseId } : {},
+          ...cutoff ? { expiresAt: { lte: cutoff } } : {},
+          ...severity ? { severity } : {},
+          isResolved: false
+        },
+        include: {
+          medicine: { select: { id: true, name: true, image: true } },
+          warehouse: { select: { id: true, name: true, city: true } }
+        },
+        orderBy: { daysLeft: "asc" }
+      });
+      sendResponse(res, { status: status44.OK, success: true, message: "Expiry alerts fetched", data });
+    }));
+    router33.patch("/:id/resolve", auth_middleware_default(["ADMIN", "WAREHOUSE"]), catchAsync(async (req, res) => {
+      const data = await prisma.expiryAlert.update({
+        where: { id: req.params.id },
+        data: { isResolved: true }
+      });
+      sendResponse(res, { status: status44.OK, success: true, message: "Alert resolved", data });
+    }));
+    expiryAlertRouter = router33;
+  }
+});
+
+// src/module/storageBin/storageBin.route.ts
+import { Router as Router34 } from "express";
+import status45 from "http-status";
+var router34, storageBinRouter;
+var init_storageBin_route = __esm({
+  "src/module/storageBin/storageBin.route.ts"() {
+    "use strict";
+    init_auth_middleware();
+    init_catchAsync();
+    init_sendResponse();
+    init_prisma();
+    router34 = Router34();
+    router34.post("/", auth_middleware_default(["ADMIN", "WAREHOUSE"]), catchAsync(async (req, res) => {
+      const data = await prisma.storageBin.create({ data: req.body, include: { location: true } });
+      sendResponse(res, { status: status45.CREATED, success: true, message: "Bin created", data });
+    }));
+    router34.get("/:warehouseId", auth_middleware_default(["ADMIN", "WAREHOUSE"]), catchAsync(async (req, res) => {
+      const warehouseId = req.params.warehouseId;
+      const data = await prisma.storageBin.findMany({
+        where: { warehouseId },
+        include: { location: true, allocations: { include: { medicine: { select: { id: true, name: true } } } } },
+        orderBy: { binCode: "asc" }
+      });
+      sendResponse(res, { status: status45.OK, success: true, message: "Bins fetched", data });
+    }));
+    router34.post("/allocate", auth_middleware_default(["WAREHOUSE"]), catchAsync(async (req, res) => {
+      const { binId, medicineId, quantity } = req.body;
+      const bin = await prisma.storageBin.findUnique({ where: { id: binId } });
+      if (!bin) return res.status(404).json({ success: false, message: "Bin not found" });
+      if (bin.currentLoad + quantity > bin.capacity) {
+        return res.status(400).json({ success: false, message: `Bin capacity exceeded. Available: ${bin.capacity - bin.currentLoad}` });
+      }
+      const [alloc] = await prisma.$transaction([
+        prisma.binAllocation.upsert({
+          where: { binId_medicineId: { binId, medicineId } },
+          update: { quantity: { increment: quantity } },
+          create: { binId, medicineId, quantity }
+        }),
+        prisma.storageBin.update({
+          where: { id: binId },
+          data: { currentLoad: { increment: quantity } }
+        })
+      ]);
+      sendResponse(res, { status: status45.OK, success: true, message: "Medicine allocated to bin", data: alloc });
+    }));
+    storageBinRouter = router34;
+  }
+});
+
+// src/module/supplier/supplier.route.ts
+import { Router as Router35 } from "express";
+import status46 from "http-status";
+var router35, supplierRouter;
+var init_supplier_route = __esm({
+  "src/module/supplier/supplier.route.ts"() {
+    "use strict";
+    init_auth_middleware();
+    init_catchAsync();
+    init_sendResponse();
+    init_prisma();
+    router35 = Router35();
+    router35.post("/", auth_middleware_default(["ADMIN", "WAREHOUSE"]), catchAsync(async (req, res) => {
+      const data = await prisma.supplier.create({ data: req.body });
+      sendResponse(res, { status: status46.CREATED, success: true, message: "Supplier created", data });
+    }));
+    router35.get("/", auth_middleware_default(["ADMIN", "WAREHOUSE", "SELLER"]), catchAsync(async (_req, res) => {
+      const data = await prisma.supplier.findMany({ where: { isActive: true }, orderBy: { name: "asc" } });
+      sendResponse(res, { status: status46.OK, success: true, message: "Suppliers fetched", data });
+    }));
+    router35.patch("/:id", auth_middleware_default(["ADMIN"]), catchAsync(async (req, res) => {
+      const data = await prisma.supplier.update({ where: { id: req.params.id }, data: req.body });
+      sendResponse(res, { status: status46.OK, success: true, message: "Supplier updated", data });
+    }));
+    router35.post("/shipments", auth_middleware_default(["ADMIN", "WAREHOUSE"]), catchAsync(async (req, res) => {
+      const data = await prisma.supplierShipment.create({
+        data: { ...req.body, expectedAt: new Date(req.body.expectedAt) },
+        include: { supplier: true, warehouse: { select: { id: true, name: true } } }
+      });
+      sendResponse(res, { status: status46.CREATED, success: true, message: "Shipment created", data });
+    }));
+    router35.get("/shipments", auth_middleware_default(["ADMIN", "WAREHOUSE"]), catchAsync(async (req, res) => {
+      const warehouseId = req.query.warehouseId;
+      const data = await prisma.supplierShipment.findMany({
+        where: warehouseId ? { warehouseId } : {},
+        include: {
+          supplier: { select: { id: true, name: true } },
+          warehouse: { select: { id: true, name: true } }
+        },
+        orderBy: { expectedAt: "asc" }
+      });
+      sendResponse(res, { status: status46.OK, success: true, message: "Shipments fetched", data });
+    }));
+    router35.patch("/shipments/:id/receive", auth_middleware_default(["WAREHOUSE"]), catchAsync(async (req, res) => {
+      const data = await prisma.supplierShipment.update({
+        where: { id: req.params.id },
+        data: { status: "RECEIVED", receivedAt: /* @__PURE__ */ new Date() }
+      });
+      sendResponse(res, { status: status46.OK, success: true, message: "Shipment marked received", data });
+    }));
+    supplierRouter = router35;
+  }
+});
+
+// src/module/temperatureLog/temperatureLog.route.ts
+import { Router as Router36 } from "express";
+import status47 from "http-status";
+var router36, temperatureLogRouter;
+var init_temperatureLog_route = __esm({
+  "src/module/temperatureLog/temperatureLog.route.ts"() {
+    "use strict";
+    init_auth_middleware();
+    init_catchAsync();
+    init_sendResponse();
+    init_prisma();
+    router36 = Router36();
+    router36.post("/", auth_middleware_default(["WAREHOUSE"]), catchAsync(async (req, res) => {
+      const { warehouseId, zone, temperature, minAllowed, maxAllowed } = req.body;
+      const isAlert = temperature < (minAllowed ?? 2) || temperature > (maxAllowed ?? 8);
+      const data = await prisma.temperatureLog.create({
+        data: {
+          warehouseId,
+          zone,
+          temperature,
+          minAllowed: minAllowed ?? 2,
+          maxAllowed: maxAllowed ?? 8,
+          isAlert,
+          recordedById: req.user.id
+        }
+      });
+      sendResponse(res, { status: status47.CREATED, success: true, message: isAlert ? "\u26A0\uFE0F ALERT: Temperature out of range!" : "Temperature logged", data });
+    }));
+    router36.get("/:warehouseId", auth_middleware_default(["ADMIN", "WAREHOUSE"]), catchAsync(async (req, res) => {
+      const warehouseId = req.params.warehouseId;
+      const zone = req.query.zone;
+      const alertsOnly = req.query.alertsOnly === "true";
+      const data = await prisma.temperatureLog.findMany({
+        where: {
+          warehouseId,
+          ...zone ? { zone } : {},
+          ...alertsOnly ? { isAlert: true } : {}
+        },
+        include: { recordedBy: { select: { id: true, name: true } } },
+        orderBy: { recordedAt: "desc" },
+        take: 200
+      });
+      sendResponse(res, { status: status47.OK, success: true, message: "Temperature logs fetched", data });
+    }));
+    temperatureLogRouter = router36;
+  }
+});
+
+// src/module/warehouseAnalytics/warehouseAnalytics.route.ts
+import { Router as Router37 } from "express";
+import status48 from "http-status";
+var router37, warehouseAnalyticsRouter;
+var init_warehouseAnalytics_route = __esm({
+  "src/module/warehouseAnalytics/warehouseAnalytics.route.ts"() {
+    "use strict";
+    init_auth_middleware();
+    init_catchAsync();
+    init_sendResponse();
+    init_prisma();
+    router37 = Router37();
+    router37.get("/:warehouseId", auth_middleware_default(["ADMIN", "WAREHOUSE"]), catchAsync(async (req, res) => {
+      const warehouseId = req.params.warehouseId;
+      const [
+        stockCount,
+        stockSum,
+        fulfillmentStats,
+        expiryCount,
+        transferCount,
+        grnCount,
+        tempAlerts,
+        topMedicines
+      ] = await Promise.all([
+        // Count unique SKUs
+        prisma.locationStock.count({ where: { warehouseId } }),
+        // Sum total units
+        prisma.locationStock.aggregate({ where: { warehouseId }, _sum: { quantity: true } }),
+        // Fulfillment breakdown by status
+        prisma.fulfillmentTask.groupBy({
+          by: ["status"],
+          where: { warehouseId },
+          _count: true
+        }),
+        // Active expiry alerts
+        prisma.expiryAlert.count({ where: { warehouseId, isResolved: false } }),
+        // Transfer count (in + out)
+        prisma.stockTransfer.count({
+          where: { OR: [{ fromWarehouseId: warehouseId }, { toWarehouseId: warehouseId }] }
+        }),
+        // GRN count
+        prisma.goodsReceiptNote.count({ where: { warehouseId } }),
+        // Temperature alerts (last 7 days)
+        prisma.temperatureLog.count({
+          where: {
+            warehouseId,
+            isAlert: true,
+            recordedAt: { gte: new Date(Date.now() - 7 * 864e5) }
+          }
+        }),
+        // Top 5 stocked medicines
+        prisma.locationStock.findMany({
+          where: { warehouseId },
+          orderBy: { quantity: "desc" },
+          take: 5,
+          include: { medicine: { select: { id: true, name: true, price: true, image: true } } }
+        })
+      ]);
+      const data = {
+        totalSkus: stockCount,
+        totalUnits: stockSum._sum.quantity ?? 0,
+        fulfillment: Object.fromEntries(fulfillmentStats.map((f) => [f.status, f._count])),
+        expiryAlerts: expiryCount,
+        transfers: transferCount,
+        grns: grnCount,
+        tempAlerts7d: tempAlerts,
+        topMedicines
+      };
+      sendResponse(res, { status: status48.OK, success: true, message: "Analytics fetched", data });
+    }));
+    warehouseAnalyticsRouter = router37;
+  }
+});
+
+// src/module/shipmentLeg/shipmentLeg.service.ts
+import status49 from "http-status";
+async function ensureTaskOnLegArrival(orderId) {
+  await ensureFulfillmentTask(orderId);
+}
+var getLegsForWarehouse, getLegsForUser, getAllLegs, receiveAtOrigin, dispatchToDestination, receiveAtDest, shipmentLegService;
+var init_shipmentLeg_service = __esm({
+  "src/module/shipmentLeg/shipmentLeg.service.ts"() {
+    "use strict";
+    init_prisma();
+    init_AppError();
+    init_subOrder_service();
+    getLegsForWarehouse = (warehouseId) => prisma.shipmentLeg.findMany({
+      where: {
+        OR: [
+          { originWarehouseId: warehouseId },
+          { destWarehouseId: warehouseId }
+        ]
+      },
+      include: {
+        subOrder: {
+          include: {
+            seller: { select: { id: true, name: true, email: true } },
+            items: { include: { medicine: { select: { id: true, name: true, image: true } } } }
+          }
+        },
+        order: { select: { id: true, address: true, user: { select: { name: true, email: true } } } },
+        originWarehouse: { select: { id: true, name: true, city: true, address: true, phone: true } },
+        destWarehouse: { select: { id: true, name: true, city: true, address: true, phone: true } }
+      },
+      orderBy: { createdAt: "desc" }
+    });
+    getLegsForUser = async (userId) => {
+      const user = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+      if (user?.role === "ADMIN") return getAllLegs();
+      const warehouses = await prisma.warehouse.findMany({
+        where: { managerId: userId },
+        select: { id: true }
+      });
+      if (!warehouses.length) return [];
+      const warehouseIds = warehouses.map((w) => w.id);
+      return prisma.shipmentLeg.findMany({
+        where: {
+          OR: [
+            { originWarehouseId: { in: warehouseIds } },
+            { destWarehouseId: { in: warehouseIds } }
+          ]
+        },
+        include: {
+          subOrder: {
+            include: {
+              seller: { select: { id: true, name: true, email: true } },
+              items: { include: { medicine: { select: { id: true, name: true, image: true } } } }
+            }
+          },
+          order: { select: { id: true, address: true, user: { select: { name: true, email: true } } } },
+          originWarehouse: { select: { id: true, name: true, city: true, address: true, phone: true } },
+          destWarehouse: { select: { id: true, name: true, city: true, address: true, phone: true } }
+        },
+        orderBy: { createdAt: "desc" }
+      });
+    };
+    getAllLegs = (filterStatus) => prisma.shipmentLeg.findMany({
+      ...filterStatus ? { where: { status: filterStatus } } : {},
+      include: {
+        subOrder: {
+          include: {
+            seller: { select: { id: true, name: true } },
+            items: { select: { quantity: true, price: true } }
+          }
+        },
+        order: { select: { id: true, address: true } },
+        originWarehouse: { select: { id: true, name: true, city: true } },
+        destWarehouse: { select: { id: true, name: true, city: true } }
+      },
+      orderBy: { createdAt: "desc" }
+    });
+    receiveAtOrigin = async (legId) => {
+      const leg = await prisma.shipmentLeg.findUnique({ where: { id: legId } });
+      if (!leg) throw new AppError_default(status49.NOT_FOUND, "Shipment leg not found");
+      if (leg.status !== "AWAITING_ORIGIN_WH")
+        throw new AppError_default(status49.BAD_REQUEST, `Cannot receive: current status is ${leg.status}`);
+      const sameWarehouse = leg.originWarehouseId === leg.destWarehouseId;
+      const updated = await prisma.shipmentLeg.update({
+        where: { id: legId },
+        data: {
+          // If origin == dest, skip IN_TRANSIT and go straight to AT_DEST_WH
+          status: sameWarehouse ? "AT_DEST_WH" : "AT_ORIGIN_WH",
+          arrivedAtOriginAt: /* @__PURE__ */ new Date(),
+          ...sameWarehouse ? { arrivedAtDestAt: /* @__PURE__ */ new Date() } : {}
+        }
+      });
+      if (sameWarehouse) {
+        await ensureTaskOnLegArrival(leg.orderId);
+      }
+      return { leg: updated };
+    };
+    dispatchToDestination = async (legId) => {
+      const leg = await prisma.shipmentLeg.findUnique({ where: { id: legId } });
+      if (!leg) throw new AppError_default(status49.NOT_FOUND, "Shipment leg not found");
+      if (leg.status !== "AT_ORIGIN_WH")
+        throw new AppError_default(status49.BAD_REQUEST, `Cannot dispatch: current status is ${leg.status}`);
+      return prisma.shipmentLeg.update({
+        where: { id: legId },
+        data: { status: "IN_TRANSIT", dispatchedAt: /* @__PURE__ */ new Date() }
+      });
+    };
+    receiveAtDest = async (legId) => {
+      const leg = await prisma.shipmentLeg.findUnique({ where: { id: legId } });
+      if (!leg) throw new AppError_default(status49.NOT_FOUND, "Shipment leg not found");
+      if (!["IN_TRANSIT", "AT_ORIGIN_WH"].includes(leg.status))
+        throw new AppError_default(status49.BAD_REQUEST, `Cannot receive at dest: current status is ${leg.status}`);
+      const updated = await prisma.shipmentLeg.update({
+        where: { id: legId },
+        data: { status: "AT_DEST_WH", arrivedAtDestAt: /* @__PURE__ */ new Date() }
+      });
+      await ensureTaskOnLegArrival(leg.orderId);
+      return { leg: updated };
+    };
+    shipmentLegService = {
+      getLegsForWarehouse,
+      getLegsForUser,
+      getAllLegs,
+      receiveAtOrigin,
+      dispatchToDestination,
+      receiveAtDest
+    };
+  }
+});
+
+// src/module/shipmentLeg/shipmentLeg.controller.ts
+import status50 from "http-status";
+var getLegs, getMyLegs, receiveAtOrigin2, dispatchToDestination2, receiveAtDest2, shipmentLegController;
+var init_shipmentLeg_controller = __esm({
+  "src/module/shipmentLeg/shipmentLeg.controller.ts"() {
+    "use strict";
+    init_catchAsync();
+    init_sendResponse();
+    init_shipmentLeg_service();
+    getLegs = catchAsync(async (req, res) => {
+      const warehouseId = req.query.warehouseId;
+      const filterStatus = req.query.status;
+      const data = warehouseId ? await shipmentLegService.getLegsForWarehouse(warehouseId) : await shipmentLegService.getAllLegs(filterStatus);
+      sendResponse(res, { status: status50.OK, success: true, message: "Shipment legs fetched", data });
+    });
+    getMyLegs = catchAsync(async (req, res) => {
+      const data = await shipmentLegService.getLegsForUser(req.user.id);
+      sendResponse(res, { status: status50.OK, success: true, message: "Shipment legs fetched", data });
+    });
+    receiveAtOrigin2 = catchAsync(async (req, res) => {
+      const data = await shipmentLegService.receiveAtOrigin(req.params.id);
+      sendResponse(res, { status: status50.OK, success: true, message: "Items received at origin warehouse", data });
+    });
+    dispatchToDestination2 = catchAsync(async (req, res) => {
+      const data = await shipmentLegService.dispatchToDestination(req.params.id);
+      sendResponse(res, { status: status50.OK, success: true, message: "Shipment dispatched to destination warehouse", data });
+    });
+    receiveAtDest2 = catchAsync(async (req, res) => {
+      const data = await shipmentLegService.receiveAtDest(req.params.id);
+      sendResponse(res, { status: status50.OK, success: true, message: "Items received at destination warehouse", data });
+    });
+    shipmentLegController = {
+      getLegs,
+      getMyLegs,
+      receiveAtOrigin: receiveAtOrigin2,
+      dispatchToDestination: dispatchToDestination2,
+      receiveAtDest: receiveAtDest2
+    };
+  }
+});
+
+// src/module/shipmentLeg/shipmentLeg.route.ts
 import express from "express";
+var router38, shipmentLegRouter;
+var init_shipmentLeg_route = __esm({
+  "src/module/shipmentLeg/shipmentLeg.route.ts"() {
+    "use strict";
+    init_shipmentLeg_controller();
+    init_auth_middleware();
+    router38 = express.Router();
+    router38.get("/mine", auth_middleware_default(["ADMIN", "WAREHOUSE"]), shipmentLegController.getMyLegs);
+    router38.get("/", auth_middleware_default(["ADMIN", "WAREHOUSE"]), shipmentLegController.getLegs);
+    router38.patch("/:id/receive-at-origin", auth_middleware_default(["WAREHOUSE"]), shipmentLegController.receiveAtOrigin);
+    router38.patch("/:id/dispatch", auth_middleware_default(["WAREHOUSE"]), shipmentLegController.dispatchToDestination);
+    router38.patch("/:id/receive-at-dest", auth_middleware_default(["WAREHOUSE"]), shipmentLegController.receiveAtDest);
+    shipmentLegRouter = router38;
+  }
+});
+
+// src/module/profile/profile.service.ts
+import status51 from "http-status";
+async function resolveNearestWH(cityOrAddress) {
+  const warehouses = await prisma.warehouse.findMany({ where: { isActive: true } });
+  if (!warehouses.length) return null;
+  if (warehouses.length === 1) return { ...warehouses[0], distanceKm: "0" };
+  const coords = extractCoordsFromBDAddress(cityOrAddress);
+  if (!coords) return { ...warehouses[0], distanceKm: "?" };
+  const nearest = warehouses.reduce(
+    (best, wh) => haversineKm(coords.lat, coords.lng, wh.lat, wh.lng) < haversineKm(coords.lat, coords.lng, best.lat, best.lng) ? wh : best
+  );
+  const dist = haversineKm(coords.lat, coords.lng, nearest.lat, nearest.lng);
+  return { ...nearest, distanceKm: dist.toFixed(1) };
+}
+function computeIsCompletedProfile(user, role) {
+  const base = !!(user.name && user.phone && user.image);
+  if (role === "SELLER") return !!(user.name && user.phone && user.image && user.businessCity);
+  return base;
+}
+var getMyProfile, updateMyProfile;
+var init_profile_service = __esm({
+  "src/module/profile/profile.service.ts"() {
+    "use strict";
+    init_prisma();
+    init_AppError();
+    init_bdGeo();
+    getMyProfile = async (userId, role) => {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          image: true,
+          phone: true,
+          role: true,
+          businessCity: true,
+          createdAt: true,
+          updatedAt: true,
+          isBanned: true,
+          wallet: { select: { id: true, balance: true } },
+          sellerLicense: { select: { status: true, licenseNumber: true, documentUrl: true } },
+          managedWarehouses: {
+            select: {
+              id: true,
+              name: true,
+              city: true,
+              address: true,
+              phone: true,
+              isActive: true,
+              lat: true,
+              lng: true,
+              _count: { select: { locationStocks: true, fulfillmentTasks: true } }
+            }
+          }
+        }
+      });
+      if (!user) throw new AppError_default(status51.NOT_FOUND, "User not found");
+      const isCompletedProfile = computeIsCompletedProfile(user, role);
+      let extra = {};
+      if (role === "SELLER") {
+        const [totalMedicines, totalSubOrders, totalReviews, revenueAgg] = await Promise.all([
+          prisma.medicine.count({ where: { sellerId: userId } }),
+          prisma.subOrder.count({ where: { sellerId: userId } }),
+          prisma.review.count({ where: { medicine: { sellerId: userId } } }),
+          prisma.subOrder.aggregate({
+            where: { sellerId: userId, status: "DELIVERED" },
+            _sum: { total: true }
+          })
+        ]);
+        const nearestOriginWarehouse = user.businessCity ? await resolveNearestWH(user.businessCity) : null;
+        extra = {
+          totalMedicines,
+          totalSubOrders,
+          totalReviews,
+          totalRevenue: revenueAgg._sum.total ?? 0,
+          nearestOriginWarehouse
+        };
+      }
+      if (role === "CUSTOMER") {
+        const [totalOrders, deliveredOrders, cancelledOrders] = await Promise.all([
+          prisma.order.count({ where: { userId } }),
+          prisma.order.count({ where: { userId, status: "DELIVERED" } }),
+          prisma.order.count({ where: { userId, status: "CANCELLED" } })
+        ]);
+        extra = {
+          totalOrders,
+          deliveredOrders,
+          cancelledOrders,
+          activeOrders: totalOrders - deliveredOrders - cancelledOrders
+        };
+      }
+      if (role === "ADMIN") {
+        const [totalUsers, totalSellers, totalCustomers, totalOrders, totalMedicines, totalWarehouses] = await Promise.all([
+          prisma.user.count(),
+          prisma.user.count({ where: { role: "SELLER" } }),
+          prisma.user.count({ where: { role: "CUSTOMER" } }),
+          prisma.order.count(),
+          prisma.medicine.count(),
+          prisma.warehouse.count({ where: { isActive: true } })
+        ]);
+        extra = { totalUsers, totalSellers, totalCustomers, totalOrders, totalMedicines, totalWarehouses };
+      }
+      if (role === "WAREHOUSE") {
+        const warehouse = user.managedWarehouses[0] ?? null;
+        if (warehouse) {
+          const [lowStock, outOfStock, inboundCount, fulfillCount] = await Promise.all([
+            prisma.locationStock.count({
+              where: { warehouseId: warehouse.id, quantity: { gt: 0, lte: 10 } }
+            }),
+            prisma.locationStock.count({
+              where: { warehouseId: warehouse.id, quantity: 0 }
+            }),
+            prisma.shipmentLeg.count({
+              where: {
+                destWarehouseId: warehouse.id,
+                status: { in: ["IN_TRANSIT", "AWAITING_ORIGIN_WH", "AT_ORIGIN_WH"] }
+              }
+            }),
+            prisma.fulfillmentTask.count({
+              where: { warehouseId: warehouse.id, status: { not: "DELIVERED" } }
+            })
+          ]);
+          extra = { warehouseStats: { lowStock, outOfStock, inboundCount, fulfillCount } };
+        }
+      }
+      return { ...user, isCompletedProfile, ...extra };
+    };
+    updateMyProfile = async (userId, data) => {
+      const updateData = {};
+      if (data.name) updateData.name = data.name;
+      if (data.image !== void 0) updateData.image = data.image || null;
+      if (data.businessCity !== void 0) updateData.businessCity = data.businessCity || null;
+      if (data.phone !== void 0) updateData.phone = data.phone || null;
+      return prisma.user.update({
+        where: { id: userId },
+        data: updateData,
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          image: true,
+          phone: true,
+          role: true,
+          businessCity: true,
+          updatedAt: true
+        }
+      });
+    };
+  }
+});
+
+// src/module/profile/profile.route.ts
+import { Router as Router38 } from "express";
+import status52 from "http-status";
+var router39, profileRouter;
+var init_profile_route = __esm({
+  "src/module/profile/profile.route.ts"() {
+    "use strict";
+    init_auth_middleware();
+    init_catchAsync();
+    init_sendResponse();
+    init_profile_service();
+    router39 = Router38();
+    router39.get(
+      "/me",
+      auth_middleware_default(["SELLER", "CUSTOMER", "ADMIN", "WAREHOUSE"]),
+      catchAsync(async (req, res) => {
+        const data = await getMyProfile(req.user.id, req.user.role);
+        sendResponse(res, { status: status52.OK, success: true, message: "Profile fetched", data });
+      })
+    );
+    router39.patch(
+      "/me",
+      auth_middleware_default(["SELLER", "CUSTOMER", "ADMIN", "WAREHOUSE"]),
+      catchAsync(async (req, res) => {
+        const { name, image, businessCity, phone } = req.body;
+        const data = await updateMyProfile(req.user.id, { name, image, businessCity, phone });
+        sendResponse(res, { status: status52.OK, success: true, message: "Profile updated", data });
+      })
+    );
+    profileRouter = router39;
+  }
+});
+
+// src/app.ts
+import express2 from "express";
 import cors from "cors";
 import { toNodeHandler } from "better-auth/node";
 import cookieParser from "cookie-parser";
@@ -4960,9 +7279,24 @@ var init_app = __esm({
     init_globalErrorHandler();
     init_dashboard_route();
     init_chatbot_route();
-    app = express();
+    init_warehouse_route();
+    init_stockTransfer_route();
+    init_grn_route();
+    init_fulfillment_route();
+    init_expiryAlert_route();
+    init_storageBin_route();
+    init_supplier_route();
+    init_temperatureLog_route();
+    init_warehouseAnalytics_route();
+    init_shipmentLeg_route();
+    init_profile_route();
+    app = express2();
     app.use(cookieParser());
-    app.use(express.json());
+    app.use((req, res, next) => {
+      if (req.headers["content-type"]?.startsWith("multipart/form-data")) return next();
+      express2.json()(req, res, next);
+    });
+    app.use(express2.urlencoded({ extended: true }));
     allowedOrigins = [
       "http://localhost:3000",
       "http://localhost:4000",
@@ -5014,6 +7348,17 @@ var init_app = __esm({
     app.use("/api/newsletter", newsletterRouter);
     app.use("/api/payments", paymentRouter);
     app.use("/api/contact", contactRouter);
+    app.use("/api/warehouses", warehouseRouter);
+    app.use("/api/stock-transfers", stockTransferRouter);
+    app.use("/api/grn", grnRouter);
+    app.use("/api/fulfillment", fulfillmentRouter);
+    app.use("/api/expiry-alerts", expiryAlertRouter);
+    app.use("/api/storage-bins", storageBinRouter);
+    app.use("/api/suppliers", supplierRouter);
+    app.use("/api/temperature-logs", temperatureLogRouter);
+    app.use("/api/warehouse-analytics", warehouseAnalyticsRouter);
+    app.use("/api/shipment-legs", shipmentLegRouter);
+    app.use("/api/profile", profileRouter);
     app.all("/api/auth/*splat", toNodeHandler(auth));
     app.get("/", (req, res) => {
       res.status(200).json({
